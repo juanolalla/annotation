@@ -1,5 +1,11 @@
 <?php
 /**
+ * @file
+ * Install, update and uninstall functions for the annotation module.
+ *
+ */
+
+/**
  * Implements hook_schema().
  */
 function annotation_schema() {
@@ -56,7 +62,7 @@ function annotation_schema() {
         'type' => 'varchar',
         'length' => 2048, // Maximum URLs length.
         'not null' => TRUE,
-        'sortable' => TRUE
+        'sortable' => TRUE,
       ),
       'ranges' => array(
         'description' => 'The ranges of the annotation.',
@@ -93,5 +99,6 @@ function annotation_schema() {
  * Implements hook_uninstall().
  */
 function annotation_uninstall() {
+  // TODO This variable was probably removed in Backdrop without replacement.
   variable_del('annotator_store');
 }

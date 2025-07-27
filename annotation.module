@@ -73,7 +73,7 @@ function annotation_entity_info() {
           ),
           'custom' => FALSE,
           'plugin' => 'annotator',
-        )
+        ),
       ),
       'bundle keys' => array(
         'bundle' => 'type',
@@ -136,7 +136,7 @@ function annotation_menu() {
   $items['admin/content/annotation'] = array(
     'title' => 'Annotations',
     'description' => 'Manage Annotations',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('annotation_admin_content'),
     'access arguments' => array('access content overview'),
     'type' => MENU_LOCAL_TASK | MENU_NORMAL_ITEM,
@@ -160,21 +160,21 @@ function annotation_menu() {
     'weight' => -10,
   );
   /*
-  $items['admin/structure/annotation/add'] = array(
-    'title' => 'Add annotation type',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('annotation_type_form'),
-    'access arguments' => array('administer content types'),
-    'type' => MENU_LOCAL_ACTION,
-    'file' => 'annotation.admin.inc',
-  );
-  */
+   $items['admin/structure/annotation/add'] = array(
+   'title' => 'Add annotation type',
+   'page callback' => 'backdrop_get_form',
+   'page arguments' => array('annotation_type_form'),
+   'access arguments' => array('administer content types'),
+   'type' => MENU_LOCAL_ACTION,
+   'file' => 'annotation.admin.inc',
+   );
+   */
   $entity_info = entity_get_info('annotation');
   foreach ($entity_info['bundles'] as $annotation_type => $bundle_info) {
     if (isset($bundle_info['admin'])) {
       // Get the base path and access.
       $path = $bundle_info['admin']['path'];
-      $access = array_intersect_key($bundle_info['admin'], drupal_map_assoc(array('access callback', 'access arguments')));
+      $access = array_intersect_key($bundle_info['admin'], backdrop_map_assoc(array('access callback', 'access arguments')));
       $access += array(
         'access callback' => 'user_access',
         'access arguments' => array('administer annotations'),
@@ -188,7 +188,7 @@ function annotation_menu() {
         'title' => 'Edit annotation type',
         //'title callback' => 'annotation_type_get_name',
         //'title arguments' => array(4),
-        'page callback' => 'drupal_get_form',
+        'page callback' => 'backdrop_get_form',
         'page arguments' => array('annotation_type_form', $annotation_type_argument),
         'file' => 'annotation.admin.inc',
       ) + $access;
@@ -213,8 +213,8 @@ function annotation_menu() {
   $items['annotation/%entity_object/delete'] = array(
     'load arguments' => array('annotation'),
     'title' => 'Delete',
-    'page callback' => 'drupal_get_form',
-    'page arguments'  => array('annotation_delete_form', 1),
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('annotation_delete_form', 1),
     'access callback' => 'annotation_access',
     'access arguments' => array('delete', 1),
     'weight' => 1,
@@ -226,14 +226,14 @@ function annotation_menu() {
   // Index; API endpoint
   $items['annotation/api'] = array(
     'page callback' => 'annotation_api',
-    'access callback' => /*'annotation_method_access'*/TRUE,
+    'access callback' => /*'annotation_method_access'*/ TRUE,
     'type' => MENU_CALLBACK,
     'file' => 'annotation.store.inc',
   );
   // Create; API endpoint to create annotations
   $items['annotation/api/annotations'] = array(
     'page callback' => 'annotation_api_endpoint',
-    'access callback' => /*'annotation_method_access'*/TRUE,
+    'access callback' => /*'annotation_method_access'*/ TRUE,
     'access arguments' => array('', 'annotation', NULL),
     'type' => MENU_CALLBACK,
     'file' => 'annotation.store.inc',
@@ -241,14 +241,14 @@ function annotation_menu() {
   $items['annotation/api/annotations/%'] = array(
     'page callback' => 'annotation_api_endpoint',
     'page arguments' => array(3),
-    'access callback' => /*'annotation_method_access'*/TRUE,
+    'access callback' => /*'annotation_method_access'*/ TRUE,
     'access arguments' => array('', 'annotation', 3),
     'type' => MENU_CALLBACK,
     'file' => 'annotation.store.inc',
   );
   $items['annotation/api/search'] = array(
     'page callback' => 'annotation_api_search',
-//    'access callback' => 'annotation_access',
+    //    'access callback' => 'annotation_access',
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
     'file' => 'annotation.store.inc',
@@ -334,11 +334,15 @@ function annotation_type_load($name) {
   $bundle = $annotation_entity['bundles'][$name];
   $bundle['type'] = $name;
   //$type = ctools_export_crud_load('file_type', $name);
-  return (object)$bundle;
+  return (object) $bundle;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function annotation_type_get_names() {
-  $names = &drupal_static(__FUNCTION__);
+  $names = &backdrop_static(__FUNCTION__);
 
   if (!isset($names)) {
     $info = entity_get_info('annotation');
@@ -367,5 +371,16 @@ function annotation_ctools_plugin_type() {
     'annotator' => array(
       'cache' => FALSE,
     ),
+  );
+}
+
+/**
+ * Implements hook_autoload_info().
+ */
+function annotation_autoload_info() {
+  return array(
+    'AnnotationClassRevision' => 'annotation.class.inc',
+    'AnnotationAPIController' => 'annotation.controller.inc',
+    'StoreAnnotatorPlugin' => 'plugins/annotator/StoreAnnotatorPlugin.class.inc',
   );
 }

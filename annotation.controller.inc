@@ -24,7 +24,7 @@ class AnnotationAPIController extends EntityAPIController {
     $entities = parent::load($ids, $conditions);
     foreach ($entities as $id => $entity) {
       $op = 'load';
-      drupal_alter('annotation', $entity, $op);
+      backdrop_alter('annotation', $entity, $op);
       $entities[$id] = $entity;
     }
     return $entities;
@@ -35,7 +35,7 @@ class AnnotationAPIController extends EntityAPIController {
    */
   public function save($entity, DatabaseTransaction $transaction = NULL) {
     $op = 'save';
-    drupal_alter('annotation', $entity, $op);
+    backdrop_alter('annotation', $entity, $op);
     parent::save($entity, $transaction);
   }
 

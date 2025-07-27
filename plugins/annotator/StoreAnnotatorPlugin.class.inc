@@ -66,7 +66,7 @@ class StoreAnnotatorPlugin extends AnnotatorPlugin {
       'showEditPermissionsCheckbox' => FALSE,
       'urls' => array(
         'create' => '/annotations',
-        'read'   => '/annotations/:id',
+        'read' => '/annotations/:id',
         'update' => '/annotations/:id',
         'destroy' => '/annotations/:id',
         'search' => '/search',
@@ -80,8 +80,8 @@ class StoreAnnotatorPlugin extends AnnotatorPlugin {
    */
   public function setup() {
     $settings = $this->settings();
-    drupal_add_js(array('annotator_store' => (array) $settings), 'setting');
-    drupal_add_js(drupal_get_path('module', 'annotation') . '/js/annotator_store.js');
+    backdrop_add_js(array('annotator_store' => (array) $settings), 'setting');
+    backdrop_add_js(backdrop_get_path('module', 'annotation') . '/js/annotator_store.js');
   }
 
 }

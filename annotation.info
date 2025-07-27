@@ -1,13 +1,10 @@
 name = Annotation
 description = Annotation entity
 package = Annotation
-core = 7.x
+backdrop = 1.x
+type = module
 
 configure = admin/structure/annotation
-
-files[] = annotation.class.inc
-files[] = annotation.controller.inc
-files[] = plugins/annotator/StoreAnnotatorPlugin.class.inc
 
 dependencies[] = ctools
 dependencies[] = entity

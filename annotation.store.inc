@@ -41,11 +41,11 @@ function annotation_api_endpoint($id = NULL) {
  * Annotation API root.
  */
 function annotation_api() {
-  drupal_json_output(
+  backdrop_json_output(
     array(
-      'name' => 'Annotator Store API',
-      'version' => ANNOTATOR_VERSION,
-    )
+    'name' => 'Annotator Store API',
+    'version' => ANNOTATOR_VERSION,
+  )
   );
 }
 
@@ -60,7 +60,7 @@ function annotation_api_index() {
     }
 
     // Send response.
-    return drupal_json_output(array_values($records));
+    return backdrop_json_output(array_values($records));
   }
   return FALSE;
 }
@@ -81,7 +81,7 @@ function annotation_api_create() {
     entity_save('annotation', $entity);
 
     // Send response.
-    return drupal_json_output($entity);
+    return backdrop_json_output($entity);
   }
   return FALSE;
 }
@@ -97,7 +97,7 @@ function annotation_api_read($id) {
       $record = annotation_api_entity_prepare($record, 'read');
 
       // Send response.
-      return drupal_json_output($record);
+      return backdrop_json_output($record);
     }
   }
   return FALSE;
@@ -115,7 +115,7 @@ function annotation_api_update($id) {
       entity_save('annotation', $entity);
 
       // Send response.
-      drupal_goto('annotation/api/annotations/' . $id, array(), 303);
+      backdrop_goto('annotation/api/annotations/' . $id, array(), 303);
       return TRUE;
     }
   }
@@ -131,8 +131,8 @@ function annotation_api_destroy($id) {
       entity_delete('annotation', $id);
 
       // Send response.
-      drupal_add_http_header('Status', '204 NO CONTENT');
-      return drupal_json_output(NULL);
+      backdrop_add_http_header('Status', '204 NO CONTENT');
+      return backdrop_json_output(NULL);
     }
   }
   return FALSE;
@@ -162,7 +162,7 @@ function annotation_api_search() {
         'total' => 0,
         'rows' => array(),
       );
-      return drupal_json_output($output);
+      return backdrop_json_output($output);
     }
   }
 
@@ -174,7 +174,7 @@ function annotation_api_search() {
   $text = isset($_GET['text']) ? $_GET['text'] : NULL;
   $quote = isset($_GET['quote']) ? $_GET['quote'] : NULL;
   $uri = isset($_GET['uri']) ? $_GET['uri'] : NULL;
-  $tags = isset($_GET['tags']) ? explode(',', $tags) : NULL;
+  $tags = isset($_GET['tags'])?explode(',', $tags) : NULL;
 
   // Initiate query.
   $query = new EntityFieldQuery();
@@ -232,7 +232,7 @@ function annotation_api_search() {
     'total' => $total,
     'rows' => array_values($records),
   );
-  return drupal_json_output($output);
+  return backdrop_json_output($output);
 }
 
 /**
@@ -250,7 +250,7 @@ function annotation_api_from_stdin() {
   }
   fclose($put);
 
-  $entity = (object) drupal_json_decode($json);
+  $entity = (object) backdrop_json_decode($json);
   $entity = annotation_api_entity_prepare($entity);
   return $entity;
 }
@@ -264,7 +264,7 @@ function annotation_api_entity_prepare($entity, $op = NULL) {
       $account = user_load($entity->uid);
       $entity->user = array(
         'uid' => $account->uid,
-        'name' => format_username($account),
+        'name' => user_format_name($account),
         'roles' => array_values($account->roles),
       );
       unset($entity->uid);

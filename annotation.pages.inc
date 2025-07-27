@@ -13,7 +13,7 @@ function annotation_view_page($entity, $view_mode = 'full', $langcode = NULL) {
     return annotation_view($entity, $view_mode = 'full', $langcode = NULL);
   }
   else {
-    return drupal_not_found();
+    return backdrop_not_found();
   }
 }
 
@@ -40,8 +40,8 @@ function annotation_delete_form($form, &$form_state, $annotation) {
 
   return confirm_form($form,
     t('Are you sure you want to delete the annotation %id?', array(
-      '%id' => $annotation->id,
-    )),
+    '%id' => $annotation->id,
+  )),
     'annotation/' . $annotation->id,
     $description,
     t('Delete')
@@ -60,7 +60,7 @@ function annotation_delete_form_submit($form, &$form_state) {
       '%id' => $annotation->id,
     );
     watchdog('annotation', '@type: deleted %id.', $args);
-    drupal_set_message(t('Annotation %id has been deleted.', $args));
+    backdrop_set_message(t('Annotation %id has been deleted.', $args));
   }
 
   $form_state['redirect'] = '<front>';

@@ -7,9 +7,9 @@
 
   'use strict';
 
-  Drupal.behaviors.annotatorStore = {
+  Backdrop.behaviors.annotatorStore = {
     attach: function (context, settings) {
-      Drupal.Annotator.annotator('addPlugin', 'Store', {
+      Backdrop.Annotator.annotator('addPlugin', 'Store', {
         prefix: settings.annotator_store.prefix,
         urls: settings.annotator_store.urls,
         showViewPermissionsCheckbox: settings.annotator_store.showViewPermissionsCheckbox,

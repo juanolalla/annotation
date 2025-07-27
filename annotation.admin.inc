@@ -14,7 +14,10 @@ function annotation_admin_types() {
   $field_ui = module_exists('field_ui');
   $header = array(
     t('Name'),
-    array('data' => t('Operations'), 'colspan' => $field_ui ? '4' : '2'),
+    array(
+      'data' => t('Operations'),
+      'colspan' => $field_ui ? '4' : '2',
+    ),
   );
   $rows = array();
 
@@ -73,10 +76,22 @@ function annotation_admin_content($form, $form_state) {
 
   // Build the sortable table header.
   $header = array(
-    'text' => array('data' => t('Text'), 'field' => 'a.text'),
-    'type' => array('data' => t('Type'), 'field' => 'a.type'),
-    'quote' => array('data' => t('Quote'), 'field' => 'a.quote'),
-    'uri' => array('data' => t('Uri'), 'field' => 'a.uri'),
+    'text' => array(
+      'data' => t('Text'),
+      'field' => 'a.text',
+    ),
+    'type' => array(
+      'data' => t('Type'),
+      'field' => 'a.type',
+    ),
+    'quote' => array(
+      'data' => t('Quote'),
+      'field' => 'a.quote',
+    ),
+    'uri' => array(
+      'data' => t('Uri'),
+      'field' => 'a.uri',
+    ),
     'author' => t('Author'),
     'timestamp' => array(
       'data' => t('Updated'),
@@ -96,7 +111,7 @@ function annotation_admin_content($form, $form_state) {
     ->fetchAllKeyed();
   $annotations = entity_load_multiple_by_name('annotation', array_keys($result));
   $accounts = user_load_multiple(array_unique($result));
-  $destination = drupal_get_destination();
+  $destination = backdrop_get_destination();
   $options = array();
 
   foreach ($annotations as $annotation) {
@@ -250,6 +265,6 @@ function annotation_type_submit($form, &$form_state) {
 
   file_type_save($type);
 
-  drupal_set_message(t('The annotation type %type has been updated.', array('%type' => $type->label)));
+  backdrop_set_message(t('The annotation type %type has been updated.', array('%type' => $type->label)));
   $form_state['redirect'] = 'admin/structure/annotation';
 }
