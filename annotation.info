@@ -5,6 +5,3 @@ backdrop = 1.x
 type = module
 
 configure = admin/structure/annotation
-
-dependencies[] = ctools
-dependencies[] = entity

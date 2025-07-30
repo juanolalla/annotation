@@ -1,104 +1,57 @@
 <?php
 /**
  * @file
- * Install, update and uninstall functions for the annotation module.
- *
+ * Install, update, and uninstall functions for the Annotation module.
  */
 
 /**
  * Implements hook_schema().
  */
 function annotation_schema() {
-  $schema = array();
-  $schema['annotation'] = array(
-    'description' => 'Stores annotations.',
-    'fields' => array(
-      'id' => array(
-        'description' => 'Primary Key: Unique item ID.',
+  $schema['annotation'] = [
+    'description' => 'Stores annotations created via RecogitoJS.',
+    'fields' => [
+      'aid' => [
+        'description' => 'Primary Key: The annotation ID.',
         'type' => 'serial',
         'unsigned' => TRUE,
         'not null' => TRUE,
-      ),
-      'type' => array(
-        'description' => 'The type of annotation.',
-        'type' => 'varchar',
-        'length' => 32,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'language' => array(
-        'description' => 'The {languages}.language of this node.',
-        'type' => 'varchar',
-        'length' => 12,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'created' => array(
-        'description' => 'The creation datetime of the annotation.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'updated' => array(
-        'description' => 'The updated datetime of the annotation.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'text' => array(
-        'description' => 'content of annotation',
+      ],
+      'body' => [
+        'description' => 'The comment body text.',
         'type' => 'text',
-        'size' => 'big',
-        'not null' => FALSE,
-      ),
-      'quote' => array(
-        'description' => 'The text of this annotation.',
+        'not null' => TRUE,
+      ],
+      'target' => [
+        'description' => 'The target string the annotation refers to.',
         'type' => 'text',
-        'size' => 'big',
         'not null' => TRUE,
-      ),
-      'uri' => array(
-        'description' => 'Type uri of this annotation.',
-        'type' => 'varchar',
-        'length' => 2048, // Maximum URLs length.
-        'not null' => TRUE,
-        'sortable' => TRUE,
-      ),
-      'ranges' => array(
-        'description' => 'The ranges of the annotation.',
-        'type' => 'blob',
-        'size' => 'big',
-        'not null' => TRUE,
-        'serialize' => TRUE,
-      ),
-      'uid' => array(
-        'description' => t('user id of annotation owner'),
+      ],
+      'start' => [
+        'description' => 'Character offset where the annotated text starts.',
         'type' => 'int',
+        'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-      ),
-    ),
-    'indexes' => array(
-      'uid' => array('uid'),
-      'annotation_updated' => array('updated'),
-      'annotation_created' => array('created'),
-      'annotation_type' => array(array('type', 4)),
-    ),
-    'foreign keys' => array(
-      'uid' => array(
-        'table' => 'users',
-        'columns' => array('uid' => 'uid'),
-      ),
-    ),
-    'primary key' => array('id'),
-  );
-  return $schema;
-}
+      ],
+      'end' => [
+        'description' => 'Character offset where the annotated text ends.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+      'created' => [
+        'description' => 'Timestamp of when the annotation was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => ['aid'],
+    'indexes' => [
+      'created' => ['created'],
+    ],
+  ];
 
-/**
- * Implements hook_uninstall().
- */
-function annotation_uninstall() {
-  // TODO This variable was probably removed in Backdrop without replacement.
-  variable_del('annotator_store');
+  return $schema;
 }
