@@ -14,6 +14,7 @@
         widgets: ['COMMENT']
       });
 
+
       // Preload annotations from PHP
       if (Backdrop.settings.recogito && Array.isArray(Backdrop.settings.recogito.annotations)) {
         r.loadAnnotations('/annotation/load?url=' + encodeURIComponent(window.location.pathname))

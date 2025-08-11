@@ -235,7 +235,8 @@ function annotation_library_info() {
     'title' => 'RecogitoJS Integration',
     'version' => '1.0',
     'js' => array(
-      $module_path . '/js/recogito-integration.js' => array(),
+      $module_path . '/js/recogito-integration.js' => array('weight' => 1),
+      $module_path . '/js/recogito-hide-replies.js' => array('weight' => 2),
     ),
     'dependencies' => array(
       array('annotation', 'recogito'),
