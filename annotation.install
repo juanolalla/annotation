@@ -17,6 +17,13 @@ function annotation_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
       ],
+      'url' => [
+        'description' => 'The full page URL where the annotation was created.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
       'body' => [
         'description' => 'The comment body text.',
         'type' => 'text',
@@ -50,6 +57,7 @@ function annotation_schema() {
     'primary key' => ['aid'],
     'indexes' => [
       'created' => ['created'],
+      'url' => ['url'],
     ],
   ];
 

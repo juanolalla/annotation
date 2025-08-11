@@ -49,13 +49,14 @@ function annotation_menu() {
 function annotation_save_callback() {
   $data = json_decode(file_get_contents('php://input'), TRUE);
 
-  if (empty($data['body']) || empty($data['target'])) {
+  if (empty($data['url']) || empty($data['body']) || empty($data['target'])) {
     backdrop_add_http_header('Content-Type', 'application/json');
     echo json_encode(['status' => 'error', 'message' => 'Missing fields']);
     backdrop_exit();
   }
 
   $annotation = entity_create('annotation', array(
+    'url' => substr($data['url'], 0, 255),
     'body' => $data['body'],
     'target' => $data['target'],
     'start' => intval($data['start']),
@@ -72,7 +73,19 @@ function annotation_save_callback() {
 function annotation_load_endpoint() {
   backdrop_add_http_header('Content-Type', 'application/json');
 
-  $annotations = entity_load_multiple('annotation', FALSE, [], ['created' => 'DESC'], 0, 100);
+  $current_url = $_GET['url'] ?? '';
+  if (empty($current_url)) {
+    echo json_encode([]); backdrop_exit();
+  }
+
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'annotation')
+    ->propertyCondition('url', $current_url);
+
+  $result = $query->execute();
+  $aids = !empty($result['annotation']) ? array_keys($result['annotation']) : [];
+
+  $annotations = entity_load('annotation', $aids);
   $output = [];
 
   foreach ($annotations as $a) {

@@ -16,22 +16,10 @@
 
       // Preload annotations from PHP
       if (Backdrop.settings.recogito && Array.isArray(Backdrop.settings.recogito.annotations)) {
-        r.loadAnnotations('/annotation/load').then(function(annotations) {
-          console.log('Loaded annotations:', annotations);
+        r.loadAnnotations('/annotation/load?url=' + encodeURIComponent(window.location.pathname))
+          .then(function(annotations) {
+            console.log('Loaded annotations:', annotations);
         });
-
-        //r.loadAnnotations(Backdrop.settings.recogito.annotations);
-        //console.log(Backdrop.settings.recogito.annotations);
-        //console.log(Array.isArray(Backdrop.settings.recogito.annotations)); // Must be true
-        // r.loadAnnotations([
-        //   {
-        //     body: [{ type: "TextualBody", value: "Test", purpose: "commenting" }],
-        //     target: {
-        //       selector: [{ type: "TextQuoteSelector", exact: "delete" }]
-        //     }
-        //   }
-        // ]);
-
       }
 
       // Save new annotations to Backdrop
@@ -46,6 +34,7 @@
         }
 
         const payload = {
+          url: window.location.pathname,
           body: body,
           target: quote.exact,
           start: position.start,
