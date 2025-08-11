@@ -43,6 +43,22 @@ function annotation_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  $items['annotation/update'] = array(
+    'title' => 'Update Annotation',
+    'page callback' => 'annotation_update_callback',
+    'access callback' => TRUE, // Add real permission check!
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'backdrop_json_deliver',
+  );
+
+  $items['annotation/delete'] = array(
+    'title' => 'Delete Annotation',
+    'page callback' => 'annotation_delete_callback',
+    'access callback' => TRUE, // Add real permission check!
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'backdrop_json_deliver',
+  );
+
   return $items;
 }
 
@@ -90,6 +106,7 @@ function annotation_load_endpoint() {
 
   foreach ($annotations as $a) {
     $output[] = [
+      'id' => $a->aid,
       'body' => [
         [
           'type' => 'TextualBody',
@@ -114,6 +131,70 @@ function annotation_load_endpoint() {
   }
 
   echo json_encode($output);
+  backdrop_exit();
+}
+
+function annotation_update_callback() {
+  $data = json_decode(file_get_contents('php://input'), TRUE);
+
+  $aid = isset($data['id']) ? intval($data['id']) : 0;
+  if (!$aid) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Missing id']);
+    backdrop_exit();
+  }
+
+  $annotations = entity_load('annotation', array($aid));
+  $annotation = $annotations ? reset($annotations) : NULL;
+  if (!$annotation) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Annotation not found']);
+    backdrop_exit();
+  }
+
+  // Update allowed fields
+  if (isset($data['body'])) {
+    $annotation->body = $data['body'];
+  }
+  if (isset($data['target'])) {
+    $annotation->target = $data['target'];
+  }
+  if (isset($data['start'])) {
+    $annotation->start = (int) $data['start'];
+  }
+  if (isset($data['end'])) {
+    $annotation->end = (int) $data['end'];
+  }
+
+  $annotation->save();
+
+  backdrop_add_http_header('Content-Type', 'application/json');
+  echo json_encode(['status' => 'success', 'id' => $annotation->aid]);
+  backdrop_exit();
+}
+
+function annotation_delete_callback() {
+  $data = json_decode(file_get_contents('php://input'), TRUE);
+
+  $aid = isset($data['id']) ? intval($data['id']) : 0;
+  if (!$aid) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Missing id']);
+    backdrop_exit();
+  }
+
+  $annotations = entity_load('annotation', array($aid));
+  $annotation = $annotations ? reset($annotations) : NULL;
+  if (!$annotation) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Annotation not found']);
+    backdrop_exit();
+  }
+
+  $annotation->delete();
+
+  backdrop_add_http_header('Content-Type', 'application/json');
+  echo json_encode(['status' => 'success']);
   backdrop_exit();
 }
 
