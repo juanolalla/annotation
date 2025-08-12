@@ -17,6 +17,13 @@ function annotation_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
       ],
+      'uid' => [
+        'description' => 'User ID of the annotation owner.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
       'url' => [
         'description' => 'The full page URL where the annotation was created.',
         'type' => 'varchar',
@@ -44,6 +51,7 @@ function annotation_schema() {
     'indexes' => [
       'created' => ['created'],
       'url' => ['url'],
+      'uid' => ['uid'],
     ],
   ];
 

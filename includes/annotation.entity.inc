@@ -6,7 +6,8 @@ class Annotation extends Entity {
   public $label;
   public $body;
   public $selectors;
-  public $user;
+  public $uid; // Owner user ID
+  public $user; // Deprecated; kept for backward compatibility
   public $created;
   public $url;
 

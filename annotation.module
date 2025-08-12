@@ -43,7 +43,7 @@ function annotation_menu() {
   $items['annotation/save'] = array(
     'title' => 'Save Annotation',
     'page callback' => 'annotation_save_callback',
-    'access callback' => TRUE, // Add real permission check!
+    'access callback' => TRUE, // Access enforced in callback.
     'type' => MENU_CALLBACK,
     'delivery callback' => 'backdrop_json_deliver',
   );
@@ -57,7 +57,7 @@ function annotation_menu() {
   $items['annotation/update'] = array(
     'title' => 'Update Annotation',
     'page callback' => 'annotation_update_callback',
-    'access callback' => TRUE, // Add real permission check!
+    'access callback' => TRUE, // Access enforced in callback.
     'type' => MENU_CALLBACK,
     'delivery callback' => 'backdrop_json_deliver',
   );
@@ -65,7 +65,7 @@ function annotation_menu() {
   $items['annotation/delete'] = array(
     'title' => 'Delete Annotation',
     'page callback' => 'annotation_delete_callback',
-    'access callback' => TRUE, // Add real permission check!
+    'access callback' => TRUE, // Access enforced in callback.
     'type' => MENU_CALLBACK,
     'delivery callback' => 'backdrop_json_deliver',
   );
@@ -74,7 +74,15 @@ function annotation_menu() {
 }
 
 function annotation_save_callback() {
+  global $user;
   $data = json_decode(file_get_contents('php://input'), TRUE);
+
+  // Only authenticated users can create annotations.
+  if (empty($user) || empty($user->uid)) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Access denied']);
+    backdrop_exit();
+  }
 
   if (empty($data['url']) || !isset($data['body']) || !isset($data['selectors'])) {
     backdrop_add_http_header('Content-Type', 'application/json');
@@ -93,6 +101,7 @@ function annotation_save_callback() {
   }
 
   $annotation = entity_create('annotation', array(
+    'uid' => (int) $user->uid,
     'url' => substr($data['url'], 0, 255),
     'body' => (string) $data['body'],
     'selectors' => $selectors,
@@ -106,7 +115,13 @@ function annotation_save_callback() {
 }
 
 function annotation_load_endpoint() {
+  global $user;
   backdrop_add_http_header('Content-Type', 'application/json');
+
+  // Anonymous users cannot see annotations at all.
+  if (empty($user) || empty($user->uid)) {
+    echo json_encode([]); backdrop_exit();
+  }
 
   $current_url = $_GET['url'] ?? '';
   if (empty($current_url)) {
@@ -115,7 +130,8 @@ function annotation_load_endpoint() {
 
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'annotation')
-    ->propertyCondition('url', $current_url);
+    ->propertyCondition('url', $current_url)
+    ->propertyCondition('uid', (int) $user->uid);
 
   $result = $query->execute();
   $aids = !empty($result['annotation']) ? array_keys($result['annotation']) : [];
@@ -159,7 +175,15 @@ function annotation_load_endpoint() {
 }
 
 function annotation_update_callback() {
+  global $user;
   $data = json_decode(file_get_contents('php://input'), TRUE);
+
+  // Must be authenticated
+  if (empty($user) || empty($user->uid)) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Access denied']);
+    backdrop_exit();
+  }
 
   $aid = isset($data['id']) ? intval($data['id']) : 0;
   if (!$aid) {
@@ -173,6 +197,13 @@ function annotation_update_callback() {
   if (!$annotation) {
     backdrop_add_http_header('Content-Type', 'application/json');
     echo json_encode(['status' => 'error', 'message' => 'Annotation not found']);
+    backdrop_exit();
+  }
+
+  // Only owner can update
+  if ((int) $annotation->uid !== (int) $user->uid) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Access denied']);
     backdrop_exit();
   }
 
@@ -198,7 +229,15 @@ function annotation_update_callback() {
 }
 
 function annotation_delete_callback() {
+  global $user;
   $data = json_decode(file_get_contents('php://input'), TRUE);
+
+  // Must be authenticated
+  if (empty($user) || empty($user->uid)) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Access denied']);
+    backdrop_exit();
+  }
 
   $aid = isset($data['id']) ? intval($data['id']) : 0;
   if (!$aid) {
@@ -212,6 +251,13 @@ function annotation_delete_callback() {
   if (!$annotation) {
     backdrop_add_http_header('Content-Type', 'application/json');
     echo json_encode(['status' => 'error', 'message' => 'Annotation not found']);
+    backdrop_exit();
+  }
+
+  // Only owner can delete
+  if ((int) $annotation->uid !== (int) $user->uid) {
+    backdrop_add_http_header('Content-Type', 'application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Access denied']);
     backdrop_exit();
   }
 
@@ -275,6 +321,13 @@ function annotation_library_info() {
  * Implements hook_init().
  */
 function annotation_init() {
+  global $user;
+
+  // Do not attach Recogito for anonymous users.
+  if (empty($user) || empty($user->uid)) {
+    return;
+  }
+
   backdrop_add_library('annotation', 'recogito_integration');
 
   // Determine selector from configuration with a sensible default.
@@ -284,14 +337,15 @@ function annotation_init() {
     $selector = '.node';
   }
 
-  // Load all annotations for the current URL (filter by URL, no limit).
+  // Load all annotations for the current URL (filter by URL, only for current user).
   $path = parse_url(request_uri(), PHP_URL_PATH);
 
   $aids = array();
   if (!empty($path)) {
     $query = new EntityFieldQuery();
     $query->entityCondition('entity_type', 'annotation')
-      ->propertyCondition('url', $path);
+      ->propertyCondition('url', $path)
+      ->propertyCondition('uid', (int) $user->uid);
     $result = $query->execute();
     if (!empty($result['annotation'])) {
       $aids = array_keys($result['annotation']);
