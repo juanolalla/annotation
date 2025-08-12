@@ -252,11 +252,21 @@ function annotation_library_info() {
 function annotation_init() {
   backdrop_add_library('annotation', 'recogito_integration');
 
-  // Load last 10 annotations (or filter by context if needed).
-  $annotations = entity_load_multiple('annotation', FALSE, [], ['created' => 'DESC'], 0, 10);
-//  $nid = arg(1); // For example, on node/123
-//  $annotations = db_query("SELECT * FROM {annotation} WHERE nid = :nid", [':nid' => $nid])->fetchAllAssoc('aid');
-  // Or load via entity_load_multiple() with conditions
+  // Load all annotations for the current URL (filter by URL, no limit).
+  $path = parse_url(request_uri(), PHP_URL_PATH);
+
+  $aids = array();
+  if (!empty($path)) {
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'annotation')
+      ->propertyCondition('url', $path);
+    $result = $query->execute();
+    if (!empty($result['annotation'])) {
+      $aids = array_keys($result['annotation']);
+    }
+  }
+
+  $annotations = $aids ? entity_load('annotation', $aids) : array();
 
   $json = [];
 
@@ -280,37 +290,6 @@ function annotation_init() {
     );
   }
 
+  // Provide annotations via Backdrop settings for the frontend behavior to trigger loading.
   backdrop_add_js(array('recogito' => array('annotations' => $json)), array('type' => 'setting'));
-
-//  // Only load on content pages.
-//  if (arg(0) == 'node' && is_numeric(arg(1)) && !arg(2)) {
-//    $node = node_load(arg(1));
-//
-//    // Check if this content type should have annotations
-//    // You can replace this with your own logic or configuration
-//    $annotatable_types = array('post', 'page'); // Example content types
-//
-//    if (in_array($node->type, $annotatable_types)) {
-//      // Add the RecogitoJS library and integration.
-//      backdrop_add_library('recogitojs', 'recogito_integration');
-
-//      // Add settings for JavaScript.
-//      $settings = array(
-//        'recogitojs' => array(
-//          'selector' => '.node', // CSS selector for the content to annotate
-//          //'canCreate' => user_access('create annotations'), // Check if user can create annotations
-//          'canCreate' => TRUE,
-//          'server' => array(
-//            // Configure your annotation server endpoints if needed
-//            'endpoint' => url('annotation/api/annotations'),
-//            'searchEndpoint' => url('annotation/api/search'),
-//            'headers' => array(
-//              'X-CSRF-Token' => backdrop_get_token('annotation'),
-//            ),
-//          ),
-//        ),
-//      );
-//      backdrop_add_js($settings, 'setting');
-//    }
-//  }
 }
