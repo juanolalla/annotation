@@ -29,6 +29,17 @@ function annotation_entity_info() {
 function annotation_menu() {
   $items = array();
 
+  // Admin settings form for Recogito selector.
+  $items['admin/config/content/annotation'] = array(
+    'title' => 'Annotation settings',
+    'description' => 'Configure the CSS selector Recogito uses to attach to page content.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('annotation_admin_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'annotation.admin.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+
   $items['annotation/save'] = array(
     'title' => 'Save Annotation',
     'page callback' => 'annotation_save_callback',
@@ -246,11 +257,19 @@ function annotation_library_info() {
   return $libraries;
 }
 
+
 /**
  * Implements hook_init().
  */
 function annotation_init() {
   backdrop_add_library('annotation', 'recogito_integration');
+
+  // Determine selector from configuration with a sensible default.
+  $config = config('annotation.settings');
+  $selector = $config->get('selector');
+  if (!$selector) {
+    $selector = '.node';
+  }
 
   // Load all annotations for the current URL (filter by URL, no limit).
   $path = parse_url(request_uri(), PHP_URL_PATH);
@@ -290,6 +309,6 @@ function annotation_init() {
     );
   }
 
-  // Provide annotations via Backdrop settings for the frontend behavior to trigger loading.
-  backdrop_add_js(array('recogito' => array('annotations' => $json)), array('type' => 'setting'));
+  // Provide annotations and selector via Backdrop settings for the frontend behavior.
+  backdrop_add_js(array('recogito' => array('annotations' => $json, 'selector' => $selector)), array('type' => 'setting'));
 }

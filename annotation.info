@@ -4,4 +4,4 @@ package = Annotation
 backdrop = 1.x
 type = module
 
-configure = admin/structure/annotation
+configure = admin/config/content/annotation

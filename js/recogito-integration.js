@@ -8,12 +8,33 @@
 
   Backdrop.behaviors.recogitoIntegration = {
     attach: function (context, settings) {
+      // Determine selector from settings or fallback to default.
+      var configuredSelector = (Backdrop.settings && Backdrop.settings.recogito && Backdrop.settings.recogito.selector)
+        ? Backdrop.settings.recogito.selector
+        : '.node';
+
+      // Look up the content element safely.
+      var contentEl = document.querySelector(configuredSelector);
+      if (!contentEl) {
+        // No matching element found; safely skip initializing Recogito on this page.
+        if (window.console && console.debug) {
+          console.debug('Recogito: No element found for selector', configuredSelector);
+        }
+        return;
+      }
+
+      // Ensure Recogito library is available.
+      if (typeof Recogito === 'undefined' || !Recogito.init) {
+        if (window.console && console.warn) {
+          console.warn('Recogito library not available.');
+        }
+        return;
+      }
+
       var r = Recogito.init({
-        //content: document.getElementsByClassName('page')[0],
-        content: document.querySelector('.field-name-body .field-item'),
+        content: contentEl,
         widgets: ['COMMENT']
       });
-
 
       // Preload annotations from PHP
       if (Backdrop.settings.recogito && Array.isArray(Backdrop.settings.recogito.annotations)) {
