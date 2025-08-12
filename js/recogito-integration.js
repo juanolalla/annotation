@@ -13,14 +13,31 @@
         ? Backdrop.settings.recogito.selector
         : '.node';
 
-      // Look up the content element safely.
-      var contentEl = document.querySelector(configuredSelector);
-      if (!contentEl) {
-        // No matching element found; safely skip initializing Recogito on this page.
+      // Look up the content element safely. If multiple match, use their common ancestor.
+      var matches = document.querySelectorAll(configuredSelector);
+      var contentEl = null;
+      if (!matches || matches.length === 0) {
         if (window.console && console.debug) {
           console.debug('Recogito: No element found for selector', configuredSelector);
         }
         return;
+      } else if (matches.length === 1) {
+        contentEl = matches[0];
+      } else {
+        // Compute common ancestor of all matches.
+        var nodes = Array.prototype.slice.call(matches);
+        var ancestor = nodes[0];
+        while (ancestor) {
+          if (nodes.every(function(n) { return ancestor.contains(n); })) {
+            contentEl = ancestor;
+            break;
+          }
+          ancestor = ancestor.parentElement;
+        }
+        if (!contentEl) contentEl = document.body;
+        if (window.console && console.debug) {
+          console.debug('Recogito: Multiple elements matched. Using common ancestor:', contentEl);
+        }
       }
 
       // Ensure Recogito library is available.
@@ -36,31 +53,39 @@
         widgets: ['COMMENT']
       });
 
-      // Preload annotations from PHP
-      if (Backdrop.settings.recogito && Array.isArray(Backdrop.settings.recogito.annotations)) {
-        r.loadAnnotations('/annotation/load?url=' + encodeURIComponent(window.location.pathname))
-          .then(function(annotations) {
-            console.log('Loaded annotations:', annotations);
-        });
+      // Preload annotations from PHP (if provided in settings)
+      var preload = (Backdrop.settings && Backdrop.settings.recogito && Array.isArray(Backdrop.settings.recogito.annotations))
+        ? Backdrop.settings.recogito.annotations
+        : [];
+      if (preload.length) {
+        try {
+          r.setAnnotations(preload);
+          if (window.console && console.debug) console.debug('Preloaded annotations from settings:', preload);
+        } catch (e) {
+          if (window.console && console.warn) console.warn('Failed to preload annotations:', e);
+        }
       }
+
+      // Also load (or refresh) annotations from the server
+      r.loadAnnotations('/annotation/load?url=' + encodeURIComponent(window.location.pathname))
+        .then(function(annotations) {
+          console.log('Loaded annotations:', annotations);
+        });
 
       // Save new annotations to Backdrop
       r.on('createAnnotation', function (annotation) {
         const body = annotation.body?.[0]?.value || '';
-        const position = annotation.target?.selector?.find(sel => sel.type === 'TextPositionSelector');
-        const quote = annotation.target?.selector?.find(sel => sel.type === 'TextQuoteSelector');
+        const selectors = Array.isArray(annotation.target?.selector) ? annotation.target.selector : [];
 
-        if (!body || !position || !quote) {
-          console.warn('Incomplete annotation data:', annotation);
+        if (!selectors.length) {
+          console.warn('Incomplete annotation selectors:', annotation);
           return;
         }
 
         const payload = {
           url: window.location.pathname,
           body: body,
-          target: quote.exact,
-          start: position.start,
-          end: position.end
+          selectors: selectors
         };
 
         fetch('/annotation/save', {
@@ -87,15 +112,14 @@
       r.on('updateAnnotation', function (annotation, previous) {
         try {
           const body = annotation.body?.[0]?.value || '';
-          const position = annotation.target?.selector?.find(sel => sel.type === 'TextPositionSelector');
-          const quote = annotation.target?.selector?.find(sel => sel.type === 'TextQuoteSelector');
+          const selectors = Array.isArray(annotation.target?.selector)
+            ? annotation.target.selector
+            : (Array.isArray(previous?.target?.selector) ? previous.target.selector : []);
 
           const payload = {
             id: annotation.id || previous?.id,
             body: body,
-            target: quote ? quote.exact : previous?.target?.selector?.find(sel => sel.type === 'TextQuoteSelector')?.exact,
-            start: position ? position.start : previous?.target?.selector?.find(sel => sel.type === 'TextPositionSelector')?.start,
-            end: position ? position.end : previous?.target?.selector?.find(sel => sel.type === 'TextPositionSelector')?.end
+            selectors: selectors
           };
 
           if (!payload.id) {

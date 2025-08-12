@@ -5,12 +5,10 @@ class Annotation extends Entity {
   public $aid;
   public $label;
   public $body;
-  public $target;
+  public $selectors;
   public $user;
   public $created;
   public $url;
-  public $start;
-  public $end;
 
   public function __construct(array $values = array()) {
     parent::__construct($values, 'annotation');

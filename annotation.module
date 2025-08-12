@@ -76,18 +76,26 @@ function annotation_menu() {
 function annotation_save_callback() {
   $data = json_decode(file_get_contents('php://input'), TRUE);
 
-  if (empty($data['url']) || empty($data['body']) || empty($data['target'])) {
+  if (empty($data['url']) || !isset($data['body']) || !isset($data['selectors'])) {
     backdrop_add_http_header('Content-Type', 'application/json');
     echo json_encode(['status' => 'error', 'message' => 'Missing fields']);
     backdrop_exit();
   }
 
+  // Normalize selectors to JSON string
+  $selectors = $data['selectors'];
+  if (is_array($selectors)) {
+    // Optionally filter out anything not an object with type field
+    $selectors = json_encode(array_values($selectors));
+  } else {
+    // If client sent a string, trust it but ensure it's a string
+    $selectors = (string) $selectors;
+  }
+
   $annotation = entity_create('annotation', array(
     'url' => substr($data['url'], 0, 255),
-    'body' => $data['body'],
-    'target' => $data['target'],
-    'start' => intval($data['start']),
-    'end' => intval($data['end']),
+    'body' => (string) $data['body'],
+    'selectors' => $selectors,
     'created' => REQUEST_TIME,
   ));
   $annotation->save();
@@ -116,8 +124,23 @@ function annotation_load_endpoint() {
   $output = [];
 
   foreach ($annotations as $a) {
+    // Decode selectors as saved (keep order, include TextPositionSelector if present)
+    $selectors = [];
+    if (!empty($a->selectors)) {
+      $decoded = json_decode($a->selectors, TRUE);
+      if (is_array($decoded)) {
+        $selectors = array_values($decoded);
+      }
+    }
+
+    if (empty($selectors)) {
+      // Nothing we can anchor on; skip this record to avoid loading invalid annotations.
+      continue;
+    }
+
     $output[] = [
-      'id' => $a->aid,
+      'id' => (string) $a->aid,
+      'type' => 'Annotation',
       'body' => [
         [
           'type' => 'TextualBody',
@@ -126,17 +149,7 @@ function annotation_load_endpoint() {
         ]
       ],
       'target' => [
-        'selector' => [
-          [
-            'type' => 'TextPositionSelector',
-            'start' => (int) $a->start,
-            'end' => (int) $a->end,
-          ],
-          [
-            'type' => 'TextQuoteSelector',
-            'exact' => $a->target,
-          ]
-        ]
+        'selector' => $selectors
       ]
     ];
   }
@@ -165,16 +178,16 @@ function annotation_update_callback() {
 
   // Update allowed fields
   if (isset($data['body'])) {
-    $annotation->body = $data['body'];
+    $annotation->body = (string) $data['body'];
   }
-  if (isset($data['target'])) {
-    $annotation->target = $data['target'];
-  }
-  if (isset($data['start'])) {
-    $annotation->start = (int) $data['start'];
-  }
-  if (isset($data['end'])) {
-    $annotation->end = (int) $data['end'];
+  if (isset($data['selectors'])) {
+    $selectors = $data['selectors'];
+    if (is_array($selectors)) {
+      $selectors = json_encode(array_values($selectors));
+    } else {
+      $selectors = (string) $selectors;
+    }
+    $annotation->selectors = $selectors;
   }
 
   $annotation->save();
@@ -290,7 +303,23 @@ function annotation_init() {
   $json = [];
 
   foreach ($annotations as $annotation) {
+    // Decode selectors as saved for preloading
+    $selectors = [];
+    if (!empty($annotation->selectors)) {
+      $decoded = json_decode($annotation->selectors, TRUE);
+      if (is_array($decoded)) {
+        $selectors = array_values($decoded);
+      }
+    }
+
+    if (empty($selectors)) {
+      // Skip invalid annotations lacking selectors.
+      continue;
+    }
+
     $json[] = array(
+      'id' => (string) $annotation->aid,
+      'type' => 'Annotation',
       'body' => array(
         array(
           'type' => 'TextualBody',
@@ -299,12 +328,7 @@ function annotation_init() {
         ),
       ),
       'target' => array(
-        'selector' => array(
-          array(
-            'type' => 'TextQuoteSelector',
-            'exact' => $annotation->target,
-          ),
-        ),
+        'selector' => $selectors,
       ),
     );
   }

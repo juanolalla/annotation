@@ -29,24 +29,10 @@ function annotation_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ],
-      'target' => [
-        'description' => 'The target string the annotation refers to.',
+      'selectors' => [
+        'description' => 'JSON array of Web Annotation selectors (TextQuote with prefix/suffix, TextPosition, etc.).',
         'type' => 'text',
         'not null' => TRUE,
-      ],
-      'start' => [
-        'description' => 'Character offset where the annotated text starts.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ],
-      'end' => [
-        'description' => 'Character offset where the annotated text ends.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
       ],
       'created' => [
         'description' => 'Timestamp of when the annotation was created.',
