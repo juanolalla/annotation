@@ -53,6 +53,14 @@
         widgets: ['COMMENT']
       });
 
+      // Map temporary (client) IDs to server-assigned IDs to ensure that
+      // subsequent update/delete operations reference the correct entity
+      // even if Recogito still holds the original temporary ID instance.
+      var serverIdByTempId = Object.create(null);
+      function resolveId(id) {
+        return (id && serverIdByTempId[id]) ? serverIdByTempId[id] : id;
+      }
+
       // Preload annotations from PHP (if provided in settings)
       var preload = (Backdrop.settings && Backdrop.settings.recogito && Array.isArray(Backdrop.settings.recogito.annotations))
         ? Backdrop.settings.recogito.annotations
@@ -97,8 +105,14 @@
           .then(result => {
             if (result.status === 'success') {
               console.log('Annotation saved. ID:', result.id);
-              // Ensure future updates/deletes carry the server ID
-              annotation.id = String(result.id);
+
+              // Map the temporary ID to the server-provided ID for reliable
+              // follow-up operations within this session.
+              var tempId = annotation.id;
+              var serverId = String(result.id);
+              if (tempId) {
+                serverIdByTempId[tempId] = serverId;
+              }
             } else {
               console.error('Annotation save failed:', result.message);
             }
@@ -117,7 +131,7 @@
             : (Array.isArray(previous?.target?.selector) ? previous.target.selector : []);
 
           const payload = {
-            id: annotation.id || previous?.id,
+            id: resolveId(annotation.id || previous?.id),
             body: body,
             selectors: selectors
           };
@@ -148,7 +162,7 @@
 
       // Delete annotations in Backdrop
       r.on('deleteAnnotation', function (annotation) {
-        const id = annotation.id;
+        const id = resolveId(annotation.id);
         if (!id) {
           console.warn('Missing annotation id on delete:', annotation);
           return;
