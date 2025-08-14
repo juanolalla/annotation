@@ -57,3 +57,61 @@ function annotation_schema() {
 
   return $schema;
 }
+
+/**
+ * Implements hook_install().
+ *
+ * Import the default Annotations View and set initial settings on fresh installs.
+ */
+function annotation_install() {
+  // Install the default Annotations view on fresh installs if not present.
+  $config = config('views.view.annotation_admin');
+  if ($config->isNew()) {
+    $module_path = backdrop_get_path('module', 'annotation');
+    $default_path = $module_path . '/config/views.view.annotation_admin.json';
+    if (file_exists($default_path)) {
+      $raw = file_get_contents($default_path);
+      $data = backdrop_json_decode($raw);
+      if (is_array($data)) {
+        foreach ($data as $key => $value) {
+          $config->set($key, $value);
+        }
+        $config->save();
+      }
+    }
+  }
+
+  // Ensure a default selector exists for Recogito integration.
+  $settings = config('annotation.settings');
+  if ($settings->isNew()) {
+    $settings->set('selector', '.node')->save();
+  }
+
+  // Rebuild menus/routes and clear caches so the View page path is registered.
+  cache_clear_all();
+  menu_rebuild();
+}
+
+/**
+ * Implements hook_uninstall().
+ *
+ * Ensure any active configuration belonging to this module is removed, to avoid
+ * leaving stale Views/config after uninstall.
+ */
+function annotation_uninstall() {
+  // Delete the admin View if it exists in active configuration.
+  $view_config = config('views.view.annotation_admin');
+  if ($view_config && $view_config->isNew() === FALSE) {
+    $view_config->delete();
+  }
+
+  // Delete module settings if present.
+  $settings = config('annotation.settings');
+  if ($settings && $settings->isNew() === FALSE) {
+    $settings->delete();
+  }
+
+  // Clear caches and rebuild menus to drop any routes created by the View.
+  cache_clear_all();
+  menu_rebuild();
+}

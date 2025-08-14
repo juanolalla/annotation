@@ -40,6 +40,44 @@ function annotation_menu() {
     'type' => MENU_NORMAL_ITEM,
   );
 
+
+  // Entity pages: view, edit, delete.
+  $items['annotation/%annotation'] = array(
+    'title callback' => 'annotation_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'annotation_view_page',
+    'page arguments' => array(1),
+    'access callback' => 'annotation_access_view',
+    'access arguments' => array(1),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  // Default local task (View tab).
+  $items['annotation/%annotation/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['annotation/%annotation/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('annotation_edit_form', 1),
+    'access callback' => 'annotation_access_edit',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['annotation/%annotation/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('annotation_delete_form', 1),
+    'access callback' => 'annotation_access_delete',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10,
+  );
+
+  // JSON endpoints used by Recogito integration.
   $items['annotation/save'] = array(
     'title' => 'Save Annotation',
     'page callback' => 'annotation_save_callback',
@@ -274,6 +312,19 @@ function annotation_delete_callback() {
 function annotation_autoload_info() {
   return array(
     'Annotation' => 'includes/annotation.entity.inc',
+    'annotation_handler_field_annotation_quote' => 'views/annotation_handler_field_annotation_quote.inc',
+    'annotation_handler_field_annotation_operations' => 'views/annotation_handler_field_annotation_operations.inc',
+    'annotation_handler_field_annotation_author' => 'views/annotation_handler_field_annotation_author.inc',
+  );
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function annotation_views_api() {
+  return array(
+    'api' => '3.0',
+    'path' => backdrop_get_path('module', 'annotation') . '/views',
   );
 }
 
@@ -389,4 +440,211 @@ function annotation_init() {
 
   // Provide annotations and selector via Backdrop settings for the frontend behavior.
   backdrop_add_js(array('recogito' => array('annotations' => $json, 'selector' => $selector)), array('type' => 'setting'));
+}
+
+/**
+ * Menu loader for %annotation to load an Annotation entity by ID.
+ */
+function annotation_load($aid) {
+  $aid = (int) $aid;
+  if (!$aid) {
+    return FALSE;
+  }
+  $list = entity_load('annotation', array($aid));
+  return $list ? reset($list) : FALSE;
+}
+
+/**
+ * Access checks.
+ */
+function annotation_access_view($annotation) {
+  global $user;
+  // Allow owners and users with administer content to view.
+  return user_access('administer content') || (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
+}
+function annotation_access_edit($annotation) {
+  global $user;
+  return user_access('administer content') || (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
+}
+function annotation_access_delete($annotation) {
+  global $user;
+  return user_access('administer content') || (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
+}
+
+/**
+ * Title callback for annotation pages.
+ */
+function annotation_page_title($annotation) {
+  return t('Annotation @id', array('@id' => $annotation->aid));
+}
+
+/**
+ * Extract first available TextQuoteSelector exact quote from selectors JSON.
+ */
+function annotation_extract_quote($annotation) {
+  if (empty($annotation->selectors)) {
+    return '';
+  }
+  $decoded = json_decode($annotation->selectors, TRUE);
+  if (!is_array($decoded)) {
+    return '';
+  }
+  foreach ($decoded as $sel) {
+    if (is_array($sel)) {
+      // W3C Web Annotation format often has type TextQuoteSelector
+      if (!empty($sel['type']) && $sel['type'] === 'TextQuoteSelector' && !empty($sel['exact'])) {
+        return $sel['exact'];
+      }
+      // Some clients may nest under 'selector' field
+      if (!empty($sel['selector']) && is_array($sel['selector'])) {
+        foreach ($sel['selector'] as $inner) {
+          if (!empty($inner['type']) && $inner['type'] === 'TextQuoteSelector' && !empty($inner['exact'])) {
+            return $inner['exact'];
+          }
+        }
+      }
+    }
+  }
+  return '';
+}
+
+/**
+ * View page callback for an annotation.
+ */
+function annotation_view_page($annotation) {
+  $account = user_load($annotation->uid);
+  $quote = annotation_extract_quote($annotation);
+  $rows = array();
+  $rows[] = array(array('data' => t('Annotation text'), 'header' => TRUE), check_plain($annotation->body));
+  $rows[] = array(array('data' => t('Quote'), 'header' => TRUE), check_plain($quote));
+  $rows[] = array(array('data' => t('URI'), 'header' => TRUE), l(check_plain($annotation->url), $annotation->url, array('attributes' => array('target' => '_blank'))));
+  $rows[] = array(array('data' => t('Author'), 'header' => TRUE), theme('username', array('account' => $account)));
+  $rows[] = array(array('data' => t('Updated'), 'header' => TRUE), format_date($annotation->created, 'medium'));
+
+  $build = array();
+  $build['annotation_table'] = array(
+    '#theme' => 'table',
+    '#rows' => $rows,
+    '#header' => array(),
+  );
+  return $build;
+}
+
+/**
+ * Edit form for an annotation.
+ */
+function annotation_edit_form($form, &$form_state, $annotation) {
+  $form['body'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Annotation text'),
+    '#default_value' => $annotation->body,
+    '#required' => TRUE,
+  );
+
+  $form['aid'] = array('#type' => 'value', '#value' => $annotation->aid);
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+
+  return $form;
+}
+function annotation_edit_form_submit($form, &$form_state) {
+  $aid = (int) $form_state['values']['aid'];
+  $list = entity_load('annotation', array($aid));
+  $annotation = $list ? reset($list) : NULL;
+  if (!$annotation) {
+    backdrop_set_message(t('Annotation not found.'), 'error');
+    $form_state['redirect'] = 'admin/content/annotation';
+    return;
+  }
+  $annotation->body = (string) $form_state['values']['body'];
+  $annotation->save();
+  backdrop_set_message(t('Annotation has been saved.'));
+  $form_state['redirect'] = 'annotation/' . $annotation->aid;
+}
+
+/**
+ * Delete confirmation form for an annotation.
+ */
+function annotation_delete_form($form, &$form_state, $annotation) {
+  $form['aid'] = array('#type' => 'value', '#value' => $annotation->aid);
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete annotation @id?', array('@id' => $annotation->aid)),
+    'annotation/' . $annotation->aid,
+    t('This action cannot be undone.'),
+    t('Delete'),
+    t('Cancel')
+  );
+}
+function annotation_delete_form_submit($form, &$form_state) {
+  $aid = (int) $form_state['values']['aid'];
+  $list = entity_load('annotation', array($aid));
+  $annotation = $list ? reset($list) : NULL;
+  if ($annotation) {
+    $annotation->delete();
+    backdrop_set_message(t('Annotation has been deleted.'));
+  }
+  $form_state['redirect'] = 'admin/content/annotation';
+}
+
+/**
+ * Admin listing page for annotations.
+ */
+function annotation_admin_overview() {
+  $header = array(
+    array('data' => t('Annotation text')),
+    array('data' => t('Quote')),
+    array('data' => t('URI')),
+    array('data' => t('Author')),
+    array('data' => t('Updated')),
+    array('data' => t('Operations')),
+  );
+
+  $rows = array();
+
+  $query = db_select('annotation', 'a')
+    ->fields('a', array('aid', 'uid', 'url', 'body', 'selectors', 'created'))
+    ->orderBy('created', 'DESC');
+  $result = $query->execute();
+
+  foreach ($result as $record) {
+    // Build a temporary annotation entity-like object for helpers.
+    $annotation = new stdClass();
+    $annotation->aid = $record->aid;
+    $annotation->uid = $record->uid;
+    $annotation->url = $record->url;
+    $annotation->body = $record->body;
+    $annotation->selectors = $record->selectors;
+    $annotation->created = $record->created;
+
+    $account = user_load($annotation->uid);
+    $quote = annotation_extract_quote($annotation);
+
+    $ops = array();
+    $ops[] = l(t('View'), 'annotation/' . $annotation->aid);
+    $ops[] = l(t('Edit'), 'annotation/' . $annotation->aid . '/edit');
+    $ops[] = l(t('Delete'), 'annotation/' . $annotation->aid . '/delete');
+
+    $rows[] = array(
+      check_plain($annotation->body),
+      check_plain($quote),
+      l(check_plain($annotation->url), $annotation->url, array('attributes' => array('target' => '_blank'))),
+      theme('username', array('account' => $account)),
+      format_date($annotation->created, 'medium'),
+      array('data' => implode(' | ', $ops)),
+    );
+  }
+
+  $build['annotations'] = array(
+    '#theme' => 'table',
+    '#header' => $header,
+    '#rows' => $rows,
+    '#empty' => t('No annotations found.'),
+  );
+
+  return $build;
 }

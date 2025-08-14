@@ -1,0 +1,136 @@
+{
+  "_config_name": "views.view.annotation_admin",
+  "name": "annotation_admin",
+  "description": "Administrative listing for annotations.",
+  "module": "annotation",
+  "storage": 4,
+  "tag": "",
+  "disabled": false,
+  "base_table": "annotation",
+  "human_name": "Annotations",
+  "core": "1.x",
+  "display": {
+    "default": {
+      "display_title": "Default",
+      "display_plugin": "default",
+      "display_options": {
+        "query": { "type": "views_query", "options": [] },
+        "access": { "type": "perm", "perm": "administer nodes" },
+        "cache": { "type": "none" },
+        "exposed_form": {
+          "type": "basic",
+          "options": {
+            "submit_button": "Filter",
+            "reset_button": 0,
+            "reset_button_label": "Reset",
+            "exposed_sorts_label": "Sort by",
+            "expose_sort_order": 1,
+            "sort_asc_label": "Asc",
+            "sort_desc_label": "Desc",
+            "autosubmit": 0,
+            "autosubmit_hide": 1
+          }
+        },
+        "pager": {
+          "type": "full",
+          "options": {
+            "items_per_page": "50",
+            "offset": "0",
+            "id": "0",
+            "total_pages": "",
+            "quantity": "9",
+            "tags": {
+              "first": "« first",
+              "previous": "‹ previous",
+              "next": "next ›",
+              "last": "last »"
+            },
+            "expose": {
+              "items_per_page": 0,
+              "items_per_page_label": "Items per page",
+              "items_per_page_options": "5, 10, 20, 40, 60",
+              "items_per_page_options_all": 0,
+              "items_per_page_options_all_label": "- All -",
+              "offset": 0,
+              "offset_label": "Offset"
+            }
+          }
+        },
+        "style_plugin": "table",
+        "row_plugin": "fields",
+        "fields": {
+          "aid": {
+            "id": "aid",
+            "table": "annotation",
+            "field": "aid",
+            "exclude": 1,
+            "label": "ID"
+          },
+          "body": {
+            "id": "body",
+            "table": "annotation",
+            "field": "body",
+            "label": "Annotation text"
+          },
+          "quote": {
+            "id": "quote",
+            "table": "annotation",
+            "field": "quote",
+            "label": "Quote"
+          },
+          "url": {
+            "id": "url",
+            "table": "annotation",
+            "field": "url",
+            "label": "URI",
+            "alter": {
+              "make_link": 1,
+              "path": "[url]"
+            }
+          },
+          "author": {
+            "id": "author",
+            "table": "annotation",
+            "field": "author",
+            "label": "Author"
+          },
+          "created": {
+            "id": "created",
+            "table": "annotation",
+            "field": "created",
+            "label": "Updated"
+          },
+          "operations": {
+            "id": "operations",
+            "table": "annotation",
+            "field": "operations",
+            "label": "Operations"
+          }
+        },
+        "sorts": {
+          "created": {
+            "id": "created",
+            "table": "annotation",
+            "field": "created",
+            "order": "DESC"
+          }
+        },
+        "title": "Content"
+      }
+    },
+    "page": {
+      "display_title": "Page",
+      "display_plugin": "page",
+      "position": 0,
+      "display_options": {
+        "path": "admin/content/annotation",
+        "menu": {
+          "type": "tab",
+          "title": "Manage annotations",
+          "description": "List and manage annotations.",
+          "weight": 0
+        }
+      }
+    }
+  }
+}
