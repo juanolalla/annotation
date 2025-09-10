@@ -611,6 +611,17 @@ function annotation_view_page($annotation) {
  * Edit form for an annotation.
  */
 function annotation_edit_form($form, &$form_state, $annotation) {
+  // Show the quoted text (from selectors) before the annotation textarea for context.
+  $quote = annotation_extract_quote($annotation);
+  if (!empty($quote)) {
+    $form['quote'] = array(
+      '#type' => 'item',
+      '#title' => t('Quote'),
+      '#markup' => '<blockquote>' . check_plain($quote) . '</blockquote>',
+      '#weight' => -10,
+    );
+  }
+
   $form['body'] = array(
     '#type' => 'textarea',
     '#title' => t('Annotation text'),
