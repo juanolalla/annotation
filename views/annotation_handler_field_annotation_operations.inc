@@ -36,7 +36,7 @@ class annotation_handler_field_annotation_operations extends views_handler_field
     $annotation->aid = $aid;
     $annotation->uid = $uid;
     if (function_exists('annotation_access_edit') && annotation_access_edit($annotation)) {
-      $links[] = l(t('Edit'), 'annotation/' . $aid . '/edit');
+      $links[] = l(t('Edit'), 'annotation/' . $aid . '/edit', array('query' => backdrop_get_destination()));
     }
     if (function_exists('annotation_access_delete') && annotation_access_delete($annotation)) {
       $links[] = l(t('Delete'), 'annotation/' . $aid . '/delete');

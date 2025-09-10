@@ -635,7 +635,45 @@ function annotation_edit_form($form, &$form_state, $annotation) {
   $form['actions']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
+    '#weight' => 0,
   );
+
+  if (!empty($annotation->aid) && annotation_access_delete($annotation)) {
+    $form['actions']['delete'] = array(
+      '#type' => 'link',
+      '#title' => t('Delete'),
+      '#href' => 'annotation/' . $annotation->aid . '/delete',
+      '#options' => array(
+        'query' => isset($_GET['destination']) ? backdrop_get_destination() : array(),
+        'attributes' => array('class' => array('button', 'button-secondary', 'form-delete')),
+      ),
+      '#weight' => 15,
+    );
+  }
+
+  if (!empty($_GET['destination'])) {
+    $dest = backdrop_parse_url($_GET['destination']);
+    $dest['attributes']['class'][] = 'form-cancel';
+    $form['actions']['cancel'] = array(
+      '#type' => 'link',
+      '#title' => t('Cancel'),
+      '#href' => $dest['path'],
+      '#options' => $dest,
+      '#weight' => 20,
+    );
+  }
+  else {
+    $cancel_path = !empty($annotation->aid) ? 'annotation/' . $annotation->aid : 'admin/content/annotation';
+    $cancel_options = backdrop_parse_url($cancel_path);
+    $cancel_options['attributes']['class'][] = 'form-cancel';
+    $form['actions']['cancel'] = array(
+      '#type' => 'link',
+      '#title' => t('Cancel'),
+      '#href' => $cancel_options['path'],
+      '#options' => $cancel_options,
+      '#weight' => 20,
+    );
+  }
 
   return $form;
 }
@@ -652,6 +690,30 @@ function annotation_edit_form_submit($form, &$form_state) {
   $annotation->save();
   backdrop_set_message(t('Annotation has been saved.'));
   $form_state['redirect'] = 'annotation/' . $annotation->aid;
+}
+
+/**
+ * Cancel submit handler: redirect to view page without validation.
+ */
+function annotation_edit_form_cancel($form, &$form_state) {
+  $aid = isset($form_state['values']['aid']) ? (int) $form_state['values']['aid'] : 0;
+  if ($aid) {
+    $form_state['redirect'] = 'annotation/' . $aid;
+  } else {
+    $form_state['redirect'] = 'admin/content/annotation';
+  }
+}
+
+/**
+ * Delete submit handler: redirect to delete confirmation form.
+ */
+function annotation_edit_form_delete($form, &$form_state) {
+  $aid = isset($form_state['values']['aid']) ? (int) $form_state['values']['aid'] : 0;
+  if ($aid) {
+    $form_state['redirect'] = 'annotation/' . $aid . '/delete';
+  } else {
+    $form_state['redirect'] = 'admin/content/annotation';
+  }
 }
 
 /**
