@@ -20,6 +20,8 @@ function annotation_views_data() {
     'help' => t('Listings of annotations.'),
     'weight' => 10,
   );
+  // Declare entity type to assist generic Views handlers (e.g., bulk form).
+  $data['annotation']['table']['entity type'] = 'annotation';
 
   // Join to users table on uid.
   $data['users']['table']['join']['annotation'] = array(
@@ -144,6 +146,17 @@ function annotation_views_data() {
     'help' => t('Links to view, edit, and delete the annotation.'),
     'field' => array(
       'handler' => 'annotation_handler_field_annotation_operations',
+    ),
+  );
+
+  // Bulk operations field leveraging core views_handler_field_bulk_form.
+  $data['annotation']['bulk_form'] = array(
+    'title' => t('Bulk operations'),
+    'help' => t('Provides a checkbox on each row and a form for executing bulk actions on annotations.'),
+    'real field' => 'aid',
+    'field' => array(
+      'handler' => 'views_handler_field_bulk_form',
+      'click sortable' => FALSE,
     ),
   );
 

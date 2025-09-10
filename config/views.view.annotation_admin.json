@@ -59,6 +59,25 @@
         "style_plugin": "table",
         "row_plugin": "fields",
         "fields": {
+          "bulk_form": {
+            "id": "bulk_form",
+            "table": "annotation",
+            "field": "bulk_form",
+            "relationship": "none",
+            "group_type": "group",
+            "ui_name": "",
+            "label": "Operations",
+            "element_label_colon": 0,
+            "element_default_classes": 0,
+            "empty": "",
+            "hide_empty": 0,
+            "empty_zero": 0,
+            "hide_alter_empty": 1,
+            "include_exclude": "include",
+            "selected_actions": [
+              "annotation_delete_action"
+            ]
+          },
           "aid": {
             "id": "aid",
             "table": "annotation",

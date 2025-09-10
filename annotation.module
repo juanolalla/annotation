@@ -851,3 +851,52 @@ function annotation_views_query_alter(&$view, &$query) {
     $query->add_where(0, 'annotation.uid', $uid, '=');
   }
 }
+
+/**
+ * Implements hook_action_info().
+ */
+function annotation_action_info() {
+  return array(
+    'annotation_delete_action' => array(
+      'type' => 'annotation',
+      'label' => t('Delete selected annotations'),
+      'callback' => 'annotation_delete_action',
+    ),
+  );
+}
+
+/**
+ * Action callback: delete an annotation entity (with access checks).
+ *
+ * @param object $annotation
+ *   The annotation entity.
+ * @param array $context
+ *   Execution context (unused).
+ *
+ * @return bool
+ *   FALSE to indicate the action was not applied; any other value counts
+ *   as success by Views bulk form.
+ */
+function annotation_delete_action($annotation, &$context) {
+  global $user;
+  if (empty($annotation) || empty($annotation->aid)) {
+    return FALSE;
+  }
+
+  // Allow admins to delete any annotation; otherwise only the owner with edit own.
+  $is_admin = user_access('administer annotations');
+  $is_owner_with_perm = user_access('edit own annotations') && !empty($user->uid) && ((int) $user->uid === (int) $annotation->uid);
+  if (!$is_admin && !$is_owner_with_perm) {
+    // Skip silently; backend access is enforced here.
+    return FALSE;
+  }
+
+  try {
+    $annotation->delete();
+    return TRUE;
+  }
+  catch (Exception $e) {
+    watchdog('annotation', 'Failed to delete annotation @id during bulk action: @msg', array('@id' => $annotation->aid, '@msg' => $e->getMessage()), WATCHDOG_WARNING);
+    return FALSE;
+  }
+}
