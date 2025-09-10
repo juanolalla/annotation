@@ -48,9 +48,15 @@
         return;
       }
 
+      // Determine read-only mode from Backdrop settings permissions.
+      var perms = (Backdrop.settings && Backdrop.settings.recogito && Backdrop.settings.recogito.permissions) || {};
+      // Compute read-only defensively in case backend is outdated.
+      var readOnly = ('readOnly' in perms) ? !!perms.readOnly : !(!!perms.canCreate || !!perms.canEditOwn || !!perms.canAdmin);
+
       var r = Recogito.init({
         content: contentEl,
-        widgets: ['COMMENT']
+        widgets: ['COMMENT'],
+        readOnly: readOnly
       });
 
       // Map temporary (client) IDs to server-assigned IDs to ensure that
@@ -80,108 +86,136 @@
           console.log('Loaded annotations:', annotations);
         });
 
-      // Save new annotations to Backdrop
-      r.on('createAnnotation', function (annotation) {
-        const body = annotation.body?.[0]?.value || '';
-        const selectors = Array.isArray(annotation.target?.selector) ? annotation.target.selector : [];
-
-        if (!selectors.length) {
-          console.warn('Incomplete annotation selectors:', annotation);
-          return;
-        }
-
-        const payload = {
-          url: window.location.pathname,
-          body: body,
-          selectors: selectors
-        };
-
-        fetch('/annotation/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        })
-          .then(res => res.json())
-          .then(result => {
-            if (result.status === 'success') {
-              console.log('Annotation saved. ID:', result.id);
-
-              // Map the temporary ID to the server-provided ID for reliable
-              // follow-up operations within this session.
-              var tempId = annotation.id;
-              var serverId = String(result.id);
-              if (tempId) {
-                serverIdByTempId[tempId] = serverId;
-              }
-            } else {
-              console.error('Annotation save failed:', result.message);
+      if (!readOnly) {
+        if (perms.canCreate || perms.canAdmin) {
+          r.on('createAnnotation', function (annotation) {
+            var body = '';
+            if (annotation && annotation.body && annotation.body[0] && typeof annotation.body[0].value !== 'undefined') {
+              body = annotation.body[0].value;
             }
-          })
-          .catch(error => {
-            console.error('Annotation save error:', error);
-          });
-      });
-
-      // Update existing annotations in Backdrop
-      r.on('updateAnnotation', function (annotation, previous) {
-        try {
-          const body = annotation.body?.[0]?.value || '';
-          const selectors = Array.isArray(annotation.target?.selector)
-            ? annotation.target.selector
-            : (Array.isArray(previous?.target?.selector) ? previous.target.selector : []);
-
-          const payload = {
-            id: resolveId(annotation.id || previous?.id),
-            body: body,
-            selectors: selectors
-          };
-
-          if (!payload.id) {
-            console.warn('Missing annotation id on update:', annotation, previous);
-            return;
-          }
-
-          fetch('/annotation/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          })
-            .then(res => res.json())
-            .then(result => {
-              if (result.status !== 'success') {
-                console.error('Annotation update failed:', result.message);
+            var selectors = (annotation && annotation.target && Array.isArray(annotation.target.selector)) ? annotation.target.selector : [];
+            if (!selectors.length) {
+              if (window.console && console.warn) {
+                console.warn('Incomplete annotation selectors:', annotation);
               }
+              return;
+            }
+            var payload = {
+              url: window.location.pathname,
+              body: body,
+              selectors: selectors
+            };
+            fetch('/annotation/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
             })
-            .catch(error => {
-              console.error('Annotation update error:', error);
-            });
-        } catch (e) {
-          console.error('Unexpected error preparing annotation update:', e);
-        }
-      });
-
-      // Delete annotations in Backdrop
-      r.on('deleteAnnotation', function (annotation) {
-        const id = resolveId(annotation.id);
-        if (!id) {
-          console.warn('Missing annotation id on delete:', annotation);
-          return;
-        }
-        fetch('/annotation/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: id })
-        })
-          .then(res => res.json())
-          .then(result => {
-            if (result.status !== 'success') {
-              console.error('Annotation delete failed:', result.message);
-            }
-          })
-          .catch(error => {
-            console.error('Annotation delete error:', error);
+              .then(function(res) { return res.json(); })
+              .then(function(result) {
+                if (result.status === 'success') {
+                  if (window.console && console.log) {
+                    console.log('Annotation saved. ID:', result.id);
+                  }
+                  var tempId = annotation.id;
+                  var serverId = String(result.id);
+                  if (tempId) {
+                    serverIdByTempId[tempId] = serverId;
+                  }
+                } else {
+                  if (window.console && console.error) {
+                    console.error('Annotation save failed:', result.message);
+                  }
+                }
+              })
+              .catch(function(error) {
+                if (window.console && console.error) {
+                  console.error('Annotation save error:', error);
+                }
+              });
           });
-      });
+        }
+
+        if (perms.canEditOwn || perms.canAdmin) {
+          r.on('updateAnnotation', function (annotation, previous) {
+            try {
+              var body = '';
+              if (annotation && annotation.body && annotation.body[0] && typeof annotation.body[0].value !== 'undefined') {
+                body = annotation.body[0].value;
+              }
+              var selectors;
+              if (annotation && annotation.target && Array.isArray(annotation.target.selector)) {
+                selectors = annotation.target.selector;
+              } else if (previous && previous.target && Array.isArray(previous.target.selector)) {
+                selectors = previous.target.selector;
+              } else {
+                selectors = [];
+              }
+              var idToUse = resolveId((annotation && annotation.id) ? annotation.id : (previous ? previous.id : undefined));
+              var payload = {
+                id: idToUse,
+                body: body,
+                selectors: selectors
+              };
+              if (!payload.id) {
+                if (window.console && console.warn) {
+                  console.warn('Missing annotation id on update:', annotation, previous);
+                }
+                return;
+              }
+              fetch('/annotation/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              })
+                .then(function(res) { return res.json(); })
+                .then(function(result) {
+                  if (result.status !== 'success') {
+                    if (window.console && console.error) {
+                      console.error('Annotation update failed:', result.message);
+                    }
+                  }
+                })
+                .catch(function(error) {
+                  if (window.console && console.error) {
+                    console.error('Annotation update error:', error);
+                  }
+                });
+            } catch (e) {
+              if (window.console && console.error) {
+                console.error('Unexpected error preparing annotation update:', e);
+              }
+            }
+          });
+
+          r.on('deleteAnnotation', function (annotation) {
+            var id = resolveId(annotation.id);
+            if (!id) {
+              if (window.console && console.warn) {
+                console.warn('Missing annotation id on delete:', annotation);
+              }
+              return;
+            }
+            fetch('/annotation/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: id })
+            })
+              .then(function(res) { return res.json(); })
+              .then(function(result) {
+                if (result.status !== 'success') {
+                  if (window.console && console.error) {
+                    console.error('Annotation delete failed:', result.message);
+                  }
+                }
+              })
+              .catch(function(error) {
+                if (window.console && console.error) {
+                  console.error('Annotation delete error:', error);
+                }
+              });
+          });
+        }
+      }
     }
   };
 

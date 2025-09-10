@@ -143,8 +143,8 @@ function annotation_save_callback() {
   global $user;
   $data = json_decode(file_get_contents('php://input'), TRUE);
 
-  // Only authenticated users can create annotations.
-  if (empty($user) || empty($user->uid)) {
+  // Only authenticated users with permission can create annotations.
+  if (empty($user) || empty($user->uid) || (!user_access('administer annotations') && !user_access('create annotations'))) {
     backdrop_add_http_header('Content-Type', 'application/json');
     echo json_encode(['status' => 'error', 'message' => 'Access denied']);
     backdrop_exit();
@@ -477,7 +477,21 @@ function annotation_init() {
   }
 
   // Provide annotations and selector via Backdrop settings for the frontend behavior.
-  backdrop_add_js(array('recogito' => array('annotations' => $json, 'selector' => $selector)), array('type' => 'setting'));
+  // Expose minimal permission flags so the frontend can switch Recogito to read-only.
+  $can_create = user_access('create annotations');
+  $settings = array(
+    'recogito' => array(
+      'annotations' => $json,
+      'selector' => $selector,
+      'permissions' => array(
+        'canAdmin' => (bool) $can_admin,
+        'canEditOwn' => (bool) $can_edit_own,
+        'canCreate' => (bool) $can_create,
+        'readOnly' => (!$can_admin && !$can_edit_own && !$can_create),
+      ),
+    ),
+  );
+  backdrop_add_js($settings, array('type' => 'setting'));
 }
 
 /**
