@@ -277,8 +277,8 @@ function annotation_update_callback() {
     backdrop_exit();
   }
 
-  // Only owner can update
-  if ((int) $annotation->uid !== (int) $user->uid) {
+  // Allow admins to update any annotation; otherwise only the owner.
+  if (!user_access('administer annotations') && (int) $annotation->uid !== (int) $user->uid) {
     backdrop_add_http_header('Content-Type', 'application/json');
     echo json_encode(['status' => 'error', 'message' => 'Access denied']);
     backdrop_exit();
@@ -331,8 +331,8 @@ function annotation_delete_callback() {
     backdrop_exit();
   }
 
-  // Only owner can delete
-  if ((int) $annotation->uid !== (int) $user->uid) {
+  // Allow admins to delete any annotation; otherwise only the owner.
+  if (!user_access('administer annotations') && (int) $annotation->uid !== (int) $user->uid) {
     backdrop_add_http_header('Content-Type', 'application/json');
     echo json_encode(['status' => 'error', 'message' => 'Access denied']);
     backdrop_exit();
@@ -669,6 +669,24 @@ function annotation_delete_form_submit($form, &$form_state) {
 }
 
 /**
+ * Alter the menu entry for the Views-based Manage annotations page to enforce
+ * custom access: allow admins or users who can edit own annotations.
+ */
+function annotation_menu_alter(&$items) {
+  if (isset($items['admin/content/annotation'])) {
+    $items['admin/content/annotation']['access callback'] = 'annotation_manage_access';
+    $items['admin/content/annotation']['access arguments'] = array();
+  }
+}
+
+/**
+ * Custom access callback for Manage annotations page.
+ */
+function annotation_manage_access() {
+  return user_access('administer annotations') || user_access('edit own annotations');
+}
+
+/**
  * Admin listing page for annotations.
  */
 function annotation_admin_overview() {
@@ -686,6 +704,12 @@ function annotation_admin_overview() {
   $query = db_select('annotation', 'a')
     ->fields('a', array('aid', 'uid', 'url', 'body', 'selectors', 'created'))
     ->orderBy('created', 'DESC');
+
+  // If user cannot administer all annotations, restrict to their own.
+  if (!user_access('administer annotations') && !empty($GLOBALS['user']->uid)) {
+    $query->condition('uid', (int) $GLOBALS['user']->uid, '=');
+  }
+
   $result = $query->execute();
 
   foreach ($result as $record) {
@@ -703,8 +727,12 @@ function annotation_admin_overview() {
 
     $ops = array();
     $ops[] = l(t('View'), 'annotation/' . $annotation->aid);
-    $ops[] = l(t('Edit'), 'annotation/' . $annotation->aid . '/edit');
-    $ops[] = l(t('Delete'), 'annotation/' . $annotation->aid . '/delete');
+    if (annotation_access_edit($annotation)) {
+      $ops[] = l(t('Edit'), 'annotation/' . $annotation->aid . '/edit');
+    }
+    if (annotation_access_delete($annotation)) {
+      $ops[] = l(t('Delete'), 'annotation/' . $annotation->aid . '/delete');
+    }
 
     $rows[] = array(
       check_plain($annotation->body),
@@ -724,4 +752,29 @@ function annotation_admin_overview() {
   );
 
   return $build;
+}
+
+
+/**
+ * Implements hook_views_query_alter().
+ *
+ * Enforce that non-admin users only see their own annotations in the
+ * Manage annotations view.
+ */
+function annotation_views_query_alter(&$view, &$query) {
+  if (!isset($view) || empty($view->name)) {
+    return;
+  }
+  if ($view->name !== 'annotation_admin') {
+    return;
+  }
+  // Admins can see all annotations; others restricted to own.
+  if (user_access('administer annotations')) {
+    return;
+  }
+  if (isset($query) && method_exists($query, 'add_where')) {
+    $uid = !empty($GLOBALS['user']->uid) ? (int) $GLOBALS['user']->uid : 0;
+    // Restrict by base table alias 'annotation'.
+    $query->add_where(0, 'annotation.uid', $uid, '=');
+  }
 }

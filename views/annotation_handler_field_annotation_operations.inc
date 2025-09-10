@@ -31,11 +31,14 @@ class annotation_handler_field_annotation_operations extends views_handler_field
     // Always show View link; access will be enforced by the route as well.
     $links[] = l(t('View'), 'annotation/' . $aid);
 
-    // Optionally limit Edit/Delete visibility to reasonable users.
-    global $user;
-    $may_manage = user_access('administer content') || (!empty($user->uid) && (int) $user->uid === $uid);
-    if ($may_manage) {
+    // Show Edit/Delete based on annotation access helpers (administer annotations or edit own).
+    $annotation = new stdClass();
+    $annotation->aid = $aid;
+    $annotation->uid = $uid;
+    if (function_exists('annotation_access_edit') && annotation_access_edit($annotation)) {
       $links[] = l(t('Edit'), 'annotation/' . $aid . '/edit');
+    }
+    if (function_exists('annotation_access_delete') && annotation_access_delete($annotation)) {
       $links[] = l(t('Delete'), 'annotation/' . $aid . '/delete');
     }
 
