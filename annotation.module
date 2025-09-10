@@ -200,8 +200,8 @@ function annotation_load_endpoint() {
   $query->entityCondition('entity_type', 'annotation')
     ->propertyCondition('url', $current_url);
 
-  // If not admin, restrict to the current user's own annotations when only editing own is allowed.
-  if (!$can_admin && $can_edit_own && !empty($GLOBALS['user']->uid)) {
+  // If not admin, and user cannot view all annotations, but can edit own, restrict to own.
+  if (!$can_admin && !$can_view && $can_edit_own && !empty($GLOBALS['user']->uid)) {
     $query->propertyCondition('uid', (int) $GLOBALS['user']->uid);
   }
 
@@ -431,8 +431,8 @@ function annotation_init() {
     $query = new EntityFieldQuery();
     $query->entityCondition('entity_type', 'annotation')
       ->propertyCondition('url', $path);
-    // If the user cannot administer all annotations but has edit own, restrict to own.
-    if (!$can_admin && $can_edit_own && !empty($GLOBALS['user']->uid)) {
+    // If the user cannot administer all annotations, and cannot view all, but has edit own, restrict to own.
+    if (!$can_admin && !$can_view && $can_edit_own && !empty($GLOBALS['user']->uid)) {
       $query->propertyCondition('uid', (int) $GLOBALS['user']->uid);
     }
     $result = $query->execute();
