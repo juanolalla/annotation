@@ -16,7 +16,7 @@ class annotation_handler_field_annotation_operations extends views_handler_field
   }
 
   /**
-   * Render the operations as internal links.
+   * Render the operations as a Backdrop dropbutton.
    */
   public function render($values) {
     $aid = (int) $this->get_value($values, 'aid');
@@ -26,22 +26,42 @@ class annotation_handler_field_annotation_operations extends views_handler_field
       return '';
     }
 
-    $links = array();
+    // Build operations as links array suitable for a dropbutton.
+    $ops = array();
 
-    // Always show View link; access will be enforced by the route as well.
-    $links[] = l(t('View'), 'annotation/' . $aid);
+    // View link (always present; route enforces access separately).
+    $ops['annotation_view'] = array(
+      'title' => t('view'),
+      'href' => 'annotation/' . $aid,
+    );
 
-    // Show Edit/Delete based on annotation access helpers (administer annotations or edit own).
+    // Edit/Delete conditionally based on access helpers.
     $annotation = new stdClass();
     $annotation->aid = $aid;
     $annotation->uid = $uid;
+
     if (function_exists('annotation_access_edit') && annotation_access_edit($annotation)) {
-      $links[] = l(t('Edit'), 'annotation/' . $aid . '/edit', array('query' => backdrop_get_destination()));
-    }
-    if (function_exists('annotation_access_delete') && annotation_access_delete($annotation)) {
-      $links[] = l(t('Delete'), 'annotation/' . $aid . '/delete');
+      $ops['annotation_edit'] = array(
+        'title' => t('edit'),
+        'href' => 'annotation/' . $aid . '/edit',
+        'query' => backdrop_get_destination(),
+      );
     }
 
-    return implode(' | ', $links);
+    if (function_exists('annotation_access_delete') && annotation_access_delete($annotation)) {
+      $ops['annotation_delete'] = array(
+        'title' => t('delete'),
+        'href' => 'annotation/' . $aid . '/delete',
+        'query' => backdrop_get_destination(),
+      );
+    }
+
+    // Render as a dropbutton.
+    $links = array(
+      '#type' => 'dropbutton',
+      '#links' => $ops,
+    );
+
+    return backdrop_render($links);
   }
 }
