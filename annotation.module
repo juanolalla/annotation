@@ -1,6 +1,34 @@
 <?php
 
 /**
+ * Implements hook_permission().
+ */
+function annotation_permission() {
+  return array(
+    'administer annotations' => array(
+      'title' => t('Administer annotations'),
+      'description' => t('Allows users to administer annotations.'),
+      'restrict access' => TRUE,
+    ),
+    'create annotations' => array(
+      'title' => t('Create annotations'),
+      'description' => t('Allows users to annotation tasks.'),
+      'restrict access' => TRUE,
+    ),
+    'view annotations' => array(
+      'title' => t('View annotations'),
+      'description' => t('Allows users to view annotations.'),
+      'restrict access' => TRUE,
+    ),
+    'edit own annotations' => array(
+      'title' => t('Edit own annotation'),
+      'description' => t('Allows users to edit own annotations.'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+/**
  * Implements hook_entity_info().
  */
 function annotation_entity_info() {
@@ -153,11 +181,13 @@ function annotation_save_callback() {
 }
 
 function annotation_load_endpoint() {
-  global $user;
   backdrop_add_http_header('Content-Type', 'application/json');
 
-  // Anonymous users cannot see annotations at all.
-  if (empty($user) || empty($user->uid)) {
+  // Allow admins and editors to manage; allow viewers to read-only load.
+  $can_admin = user_access('administer annotations');
+  $can_edit_own = user_access('edit own annotations');
+  $can_view = user_access('view annotations');
+  if (!$can_admin && !$can_edit_own && !$can_view) {
     echo json_encode([]); backdrop_exit();
   }
 
@@ -168,8 +198,12 @@ function annotation_load_endpoint() {
 
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'annotation')
-    ->propertyCondition('url', $current_url)
-    ->propertyCondition('uid', (int) $user->uid);
+    ->propertyCondition('url', $current_url);
+
+  // If not admin, restrict to the current user's own annotations when only editing own is allowed.
+  if (!$can_admin && $can_edit_own && !empty($GLOBALS['user']->uid)) {
+    $query->propertyCondition('uid', (int) $GLOBALS['user']->uid);
+  }
 
   $result = $query->execute();
   $aids = !empty($result['annotation']) ? array_keys($result['annotation']) : [];
@@ -372,10 +406,11 @@ function annotation_library_info() {
  * Implements hook_init().
  */
 function annotation_init() {
-  global $user;
-
-  // Do not attach Recogito for anonymous users.
-  if (empty($user) || empty($user->uid)) {
+  // Attach Recogito and preload annotations for users who can manage or view them.
+  $can_admin = user_access('administer annotations');
+  $can_edit_own = user_access('edit own annotations');
+  $can_view = user_access('view annotations');
+  if (!$can_admin && !$can_edit_own && !$can_view) {
     return;
   }
 
@@ -388,15 +423,18 @@ function annotation_init() {
     $selector = '.node';
   }
 
-  // Load all annotations for the current URL (filter by URL, only for current user).
+  // Load annotations for the current URL and filter by permissions.
   $path = parse_url(request_uri(), PHP_URL_PATH);
 
   $aids = array();
   if (!empty($path)) {
     $query = new EntityFieldQuery();
     $query->entityCondition('entity_type', 'annotation')
-      ->propertyCondition('url', $path)
-      ->propertyCondition('uid', (int) $user->uid);
+      ->propertyCondition('url', $path);
+    // If the user cannot administer all annotations but has edit own, restrict to own.
+    if (!$can_admin && $can_edit_own && !empty($GLOBALS['user']->uid)) {
+      $query->propertyCondition('uid', (int) $GLOBALS['user']->uid);
+    }
     $result = $query->execute();
     if (!empty($result['annotation'])) {
       $aids = array_keys($result['annotation']);
@@ -459,16 +497,27 @@ function annotation_load($aid) {
  */
 function annotation_access_view($annotation) {
   global $user;
-  // Allow owners and users with administer content to view.
-  return user_access('administer content') || (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
+  // Allow admins, or owners who have the view permission.
+  if (user_access('administer annotations')) {
+    return TRUE;
+  }
+  return user_access('view annotations') && (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
 }
 function annotation_access_edit($annotation) {
   global $user;
-  return user_access('administer content') || (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
+  if (user_access('administer annotations')) {
+    return TRUE;
+  }
+  // Require explicit permission to edit own, and ownership.
+  return user_access('edit own annotations') && (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
 }
 function annotation_access_delete($annotation) {
   global $user;
-  return user_access('administer content') || (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
+  if (user_access('administer annotations')) {
+    return TRUE;
+  }
+  // Require explicit permission to edit own (same as delete own), and ownership.
+  return user_access('edit own annotations') && (!empty($user->uid) && (int) $user->uid === (int) $annotation->uid);
 }
 
 /**

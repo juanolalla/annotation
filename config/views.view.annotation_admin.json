@@ -15,7 +15,7 @@
       "display_plugin": "default",
       "display_options": {
         "query": { "type": "views_query", "options": [] },
-        "access": { "type": "perm", "perm": "administer nodes" },
+        "access": { "type": "perm", "perm": "administer annotations" },
         "cache": { "type": "none" },
         "exposed_form": {
           "type": "basic",
