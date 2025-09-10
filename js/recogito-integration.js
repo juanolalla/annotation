@@ -59,6 +59,151 @@
         readOnly: readOnly
       });
 
+      // Configure ownership awareness so Recogito hides edit/delete for non-owners.
+      var currentUser = (Backdrop.settings && Backdrop.settings.recogito && Backdrop.settings.recogito.currentUser) || { id: 0, name: '' };
+      if (r && typeof r.setAuthInfo === 'function') {
+        // For admins, we still set auth info but will allow full control via UI fallback below.
+        if (currentUser && currentUser.id) {
+          try {
+            r.setAuthInfo({ id: String(currentUser.id), displayName: currentUser.name || ('User ' + currentUser.id) });
+          } catch (e) {
+            if (window.console && console.warn) console.warn('Failed to set Recogito auth info:', e);
+          }
+        }
+      }
+
+      // UI fallback to hide edit/delete on non-owned annotations for non-admins.
+      function isOwner(anno) {
+        if (!anno) return false;
+        // Preferred: creator is an object with id.
+        if (anno.creator && typeof anno.creator === 'object' && typeof anno.creator.id !== 'undefined' && currentUser && typeof currentUser.id !== 'undefined') {
+          return String(anno.creator.id) === String(currentUser.id);
+        }
+        // Fallback: creator as primitive equals id or name.
+        if (typeof anno.creator !== 'undefined') {
+          if (String(anno.creator) === String(currentUser.id)) return true;
+          if (currentUser.name && String(anno.creator) === String(currentUser.name)) return true;
+        }
+        return false;
+      }
+
+      function updateEditorActionsVisibility(anno) {
+        var editor = document.querySelector('.r6o-editor');
+        if (!editor) return;
+        try {
+          // Prevent the MutationObserver from re-triggering while we make changes
+          editor._annoUpdating = true;
+
+          // Admins see all actions.
+          if (perms && perms.canAdmin) return;
+
+          var owner = isOwner(anno);
+          var allow = !!perms && !!perms.canEditOwn && owner;
+
+          // Toggle a readonly class for CSS-based fallbacks.
+          if (!allow) {
+            if (editor.className.indexOf('readonly') === -1) editor.className += ' readonly';
+          } else {
+            editor.className = editor.className.replace(/\breadonly\b/g, '').trim();
+          }
+
+          // 1) Specific known button classes (redundancy)
+          var saveBtn = editor.querySelector('.r6o-update, .r6o-save, .r6o-btn-primary');
+          var deleteBtn = editor.querySelector('.r6o-delete, .r6o-btn-danger');
+          if (saveBtn) {
+            saveBtn.style.display = allow ? '' : 'none';
+            saveBtn.disabled = !allow;
+          }
+          if (deleteBtn) {
+            deleteBtn.style.display = allow ? '' : 'none';
+            deleteBtn.disabled = !allow;
+          }
+
+          // Hide the expand arrow and any action menus for non-owners
+          var arrows = editor.querySelectorAll('.r6o-arrow-down, .r6o-arrow-up');
+          for (var a = 0; a < arrows.length; a++) {
+            arrows[a].style.display = allow ? '' : 'none';
+          }
+          var menus = editor.querySelectorAll('.r6o-menu, .r6o-actions, .r6o-actions-menu');
+          for (var mm = 0; mm < menus.length; mm++) {
+            menus[mm].style.display = allow ? '' : 'none';
+            if (!allow) menus[mm].style.pointerEvents = 'none'; else menus[mm].style.pointerEvents = '';
+          }
+
+          // 2) Generic hardening: disable all inputs and buttons when not allowed
+          if (!allow) {
+            var inputs = editor.querySelectorAll('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
+            for (var i = 0; i < inputs.length; i++) {
+              var el = inputs[i];
+              // Disable form fields
+              if (typeof el.disabled !== 'undefined') el.disabled = true;
+              // Ensure contenteditable elements become non-editable
+              if (el.getAttribute && el.getAttribute('contenteditable') !== null) {
+                el.setAttribute('contenteditable', 'false');
+              }
+              // Also make textareas readOnly to prevent edits via keyboard
+              if (typeof el.readOnly !== 'undefined') el.readOnly = true;
+            }
+
+            // Hide/disable all buttons in the editor footer/actions area
+            var buttons = editor.querySelectorAll('button');
+            for (var j = 0; j < buttons.length; j++) {
+              var btn = buttons[j];
+              // Keep close/cancel buttons visible if they exist (heuristic: look for "close" or "cancel" text)
+              var label = (btn.textContent || btn.innerText || '').toLowerCase();
+              var isCancel = label.indexOf('cancel') !== -1 || label.indexOf('close') !== -1;
+              if (!isCancel) {
+                btn.style.display = 'none';
+              }
+              btn.disabled = !isCancel;
+            }
+          } else {
+            // Re-enable inputs/buttons for own annotations
+            var reinp = editor.querySelectorAll('input, textarea, select');
+            for (var k = 0; k < reinp.length; k++) {
+              if (typeof reinp[k].disabled !== 'undefined') reinp[k].disabled = false;
+              if (typeof reinp[k].readOnly !== 'undefined') reinp[k].readOnly = false;
+            }
+            var rebtns = editor.querySelectorAll('button');
+            for (var m = 0; m < rebtns.length; m++) {
+              rebtns[m].style.display = '';
+              rebtns[m].disabled = false;
+            }
+          }
+        } catch (e) {
+          if (window.console && console.warn) console.warn('Failed to update editor actions visibility:', e);
+        } finally {
+          if (editor) editor._annoUpdating = false;
+        }
+      }
+
+      // Hook into Recogito selection to toggle visibility when an annotation is opened.
+      if (r && typeof r.on === 'function') {
+        var lastSelectedAnno = null;
+        r.on('selectAnnotation', function(anno) {
+          lastSelectedAnno = anno;
+          try { window.lastSelectedAnno = anno; } catch (e) {}
+          setTimeout(function() { updateEditorActionsVisibility(anno); setupEditorObserver(); }, 50);
+        });
+      }
+
+      // Observe the Recogito editor for dynamic changes and re-apply visibility rules.
+      function setupEditorObserver() {
+        try {
+          var editor = document.querySelector('.r6o-editor');
+          if (!editor) return;
+          if (editor._annoObserverAttached) return;
+          var observer = new MutationObserver(function() {
+            if (editor._annoUpdating) return;
+            updateEditorActionsVisibility(window.lastSelectedAnno || null);
+          });
+          observer.observe(editor, { childList: true, subtree: true });
+          editor._annoObserverAttached = true;
+        } catch (e) {
+          if (window.console && console.warn) console.warn('Failed to setup editor observer:', e);
+        }
+      }
+
       // Map temporary (client) IDs to server-assigned IDs to ensure that
       // subsequent update/delete operations reference the correct entity
       // even if Recogito still holds the original temporary ID instance.
@@ -138,6 +283,10 @@
         if (perms.canEditOwn || perms.canAdmin) {
           r.on('updateAnnotation', function (annotation, previous) {
             try {
+              // Block updates for non-owners (unless admin)
+              if (!(perms && perms.canAdmin) && !isOwner(previous || annotation)) {
+                return;
+              }
               var body = '';
               if (annotation && annotation.body && annotation.body[0] && typeof annotation.body[0].value !== 'undefined') {
                 body = annotation.body[0].value;
@@ -188,6 +337,10 @@
           });
 
           r.on('deleteAnnotation', function (annotation) {
+            // Block deletes for non-owners (unless admin)
+            if (!(perms && perms.canAdmin) && !isOwner(annotation)) {
+              return;
+            }
             var id = resolveId(annotation.id);
             if (!id) {
               if (window.console && console.warn) {

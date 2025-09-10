@@ -226,6 +226,7 @@ function annotation_load_endpoint() {
       continue;
     }
 
+    $account = user_load($a->uid);
     $output[] = [
       'id' => (string) $a->aid,
       'type' => 'Annotation',
@@ -238,6 +239,10 @@ function annotation_load_endpoint() {
       ],
       'target' => [
         'selector' => $selectors
+      ],
+      'creator' => [
+        'id' => (int) $a->uid,
+        'name' => $account ? format_username($account) : ''
       ]
     ];
   }
@@ -460,6 +465,7 @@ function annotation_init() {
       continue;
     }
 
+    $account = user_load($annotation->uid);
     $json[] = array(
       'id' => (string) $annotation->aid,
       'type' => 'Annotation',
@@ -472,6 +478,10 @@ function annotation_init() {
       ),
       'target' => array(
         'selector' => $selectors,
+      ),
+      'creator' => array(
+        'id' => (int) $annotation->uid,
+        'name' => $account ? format_username($account) : ''
       ),
     );
   }
@@ -488,6 +498,10 @@ function annotation_init() {
         'canEditOwn' => (bool) $can_edit_own,
         'canCreate' => (bool) $can_create,
         'readOnly' => (!$can_admin && !$can_edit_own && !$can_create),
+      ),
+      'currentUser' => array(
+        'id' => !empty($GLOBALS['user']->uid) ? (int) $GLOBALS['user']->uid : 0,
+        'name' => !empty($GLOBALS['user']->uid) ? format_username($GLOBALS['user']) : '',
       ),
     ),
   );
