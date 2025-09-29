@@ -115,3 +115,124 @@ function annotation_uninstall() {
   cache_clear_all();
   menu_rebuild();
 }
+
+/**
+ * Implements hook_update_1000().
+ *
+ * Upgrade Drupal 7 annotation/annotator data to Backdrop's annotation schema.
+ * - Migrate selector setting from D7 annotator_element to annotation.settings.
+ * - Transform the D7 {annotation} table fields into Backdrop equivalents.
+ *   id     -> aid (primary key)
+ *   uri    -> url (varchar 255, truncated)
+ *   text   -> body (text)
+ *   ranges/quote -> selectors (JSON)
+ *   created, uid retained
+ *
+ * The update is idempotent and safe to re-run.
+ */
+function annotation_update_1000() {
+  $txn = db_transaction();
+  try {
+    // 1. Migrate selector configuration.
+    $selector = update_variable_get('annotator_element', NULL);
+    if ($selector === NULL || trim($selector) === '') {
+      $selector = '.node';
+    }
+    config_set('annotation.settings', 'selector', $selector);
+
+    // 2. Transform the D7 annotation table if present.
+    if (db_table_exists('annotation')) {
+      // Use Backdrop's expected field definitions.
+      $bd_schema = annotation_schema();
+
+      // 2.1 Rename id -> aid and keep as primary key.
+      $has_id = db_field_exists('annotation', 'id');
+      $has_aid = db_field_exists('annotation', 'aid');
+      if ($has_id && !$has_aid) {
+        db_change_field('annotation', 'id', 'aid', $bd_schema['annotation']['fields']['aid'], array('primary key' => array('aid')));
+      }
+
+      // 2.2 Ensure url exists and copy from uri (truncated to 255).
+      if (!db_field_exists('annotation', 'url')) {
+        db_add_field('annotation', 'url', $bd_schema['annotation']['fields']['url']);
+      }
+      if (db_field_exists('annotation', 'uri')) {
+        // Populate url from uri where missing.
+        db_query("UPDATE {annotation} SET url = SUBSTRING(uri, 1, 255) WHERE (url IS NULL OR url = '') AND uri IS NOT NULL AND uri <> ''");
+      }
+
+      // 2.3 Ensure body exists and copy from text.
+      if (!db_field_exists('annotation', 'body')) {
+        db_add_field('annotation', 'body', $bd_schema['annotation']['fields']['body']);
+      }
+      if (db_field_exists('annotation', 'text')) {
+        db_query("UPDATE {annotation} SET body = text WHERE (body IS NULL OR body = '') AND text IS NOT NULL");
+      }
+
+      // 2.4 Ensure selectors exists and build from quote/ranges.
+      if (!db_field_exists('annotation', 'selectors')) {
+        db_add_field('annotation', 'selectors', $bd_schema['annotation']['fields']['selectors']);
+      }
+
+      $has_quote = db_field_exists('annotation', 'quote');
+      $has_ranges = db_field_exists('annotation', 'ranges');
+      if ($has_quote || $has_ranges) {
+        // Select only rows where selectors is empty.
+        $fields = array('aid', 'selectors');
+        if ($has_quote) { $fields[] = 'quote'; }
+        if ($has_ranges) { $fields[] = 'ranges'; }
+
+        $result = db_query('SELECT ' . implode(',', $fields) . ' FROM {annotation}');
+        foreach ($result as $row) {
+          if (!empty($row->selectors)) {
+            continue; // Already populated.
+          }
+          $selectors_arr = array();
+
+          if ($has_quote && isset($row->quote) && $row->quote !== '') {
+            $selectors_arr[] = array(
+              'type' => 'TextQuoteSelector',
+              'exact' => (string) $row->quote,
+              'prefix' => '',
+              'suffix' => '',
+            );
+          }
+
+          if (empty($selectors_arr) && $has_ranges && isset($row->ranges) && $row->ranges !== '') {
+            $decoded = @unserialize($row->ranges);
+            if ($decoded === FALSE || $decoded === NULL) {
+              // In case it is actually JSON already.
+              $decoded = json_decode($row->ranges, TRUE);
+            }
+            if (is_array($decoded)) {
+              $selectors_arr = $decoded;
+            }
+          }
+
+          if (!empty($selectors_arr)) {
+            db_update('annotation')
+              ->fields(array('selectors' => json_encode($selectors_arr)))
+              ->condition($has_aid || !$has_id ? 'aid' : 'id', (int) ($has_aid ? $row->aid : $row->id))
+              ->execute();
+          }
+        }
+      }
+
+      // 2.5 Ensure created exists (it should in D7) and is non-zero.
+      if (!db_field_exists('annotation', 'created')) {
+        db_add_field('annotation', 'created', $bd_schema['annotation']['fields']['created']);
+      }
+      db_query('UPDATE {annotation} SET created = :t WHERE (created IS NULL OR created = 0)', array(':t' => REQUEST_TIME));
+
+      // 2.6 Ensure uid exists (D7 has it already). If not, add.
+      if (!db_field_exists('annotation', 'uid')) {
+        db_add_field('annotation', 'uid', $bd_schema['annotation']['fields']['uid']);
+      }
+    }
+  }
+  catch (Exception $e) {
+    $txn->rollback();
+    throw $e;
+  }
+}
+
