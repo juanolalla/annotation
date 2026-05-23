@@ -1,4 +1,19 @@
 <?php
+/**
+ * @file
+ * Annotation module.
+ */
+
+/**
+ * Implements hook_config_info().
+ */
+function annotation_config_info() {
+  $prefixes['annotation.settings'] = array(
+    'label' => t('Annotation settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
 
 /**
  * Implements hook_permission().
